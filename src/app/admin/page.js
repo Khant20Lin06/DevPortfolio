@@ -39,6 +39,7 @@ import InquiriesView from "./views/InquiriesView";
 import AdminChatView from "./views/AdminChatView";
 import TechStackView from "./views/TechStackView";
 import GithubSyncView from "./views/GithubSyncView";
+import ProfileView from "./views/ProfileView";
 import DefaultRightPanel from "./views/DefaultRightPanel";
 import AssetsSettingsPanel from "./views/AssetsSettingsPanel";
 import TechInsightsPanel from "./views/TechInsightsPanel";
@@ -88,6 +89,22 @@ const normalizeInquiry = (item) => {
   };
 };
 
+const normalizeProfile = (value) => {
+  const social = value?.social ?? {};
+  return {
+    aboutImageUrl: String(value?.aboutImageUrl ?? defaultPortfolioContent.profile?.aboutImageUrl ?? ""),
+    profileImageUrl: String(value?.profileImageUrl ?? defaultPortfolioContent.profile?.profileImageUrl ?? ""),
+    resumeUrl: String(value?.resumeUrl ?? defaultPortfolioContent.profile?.resumeUrl ?? ""),
+    social: {
+      linkedin: String(social?.linkedin ?? defaultPortfolioContent.profile?.social?.linkedin ?? ""),
+      github: String(social?.github ?? defaultPortfolioContent.profile?.social?.github ?? ""),
+      telegram: String(social?.telegram ?? defaultPortfolioContent.profile?.social?.telegram ?? ""),
+      gmail: String(social?.gmail ?? defaultPortfolioContent.profile?.social?.gmail ?? ""),
+      location: String(social?.location ?? defaultPortfolioContent.profile?.social?.location ?? ""),
+    },
+  };
+};
+
 export default function AdminPage() {
   const router = useRouter();
   const apiEnabled = useMemo(() => isAuthApiEnabled(), []);
@@ -104,6 +121,13 @@ export default function AdminPage() {
   const [editorMessage, setEditorMessage] = useState({ tone: "neutral", text: "" });
   const [contentLoading, setContentLoading] = useState(false);
   const [savePending, setSavePending] = useState(false);
+  const [profileDraft, setProfileDraft] = useState(() =>
+    normalizeProfile(defaultPortfolioContent.profile)
+  );
+  const [profileDirty, setProfileDirty] = useState(false);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileUploadingField, setProfileUploadingField] = useState("");
+  const [profileMessage, setProfileMessage] = useState({ tone: "neutral", text: "" });
   const [inquiries, setInquiries] = useState([]);
   const [inquiriesLoading, setInquiriesLoading] = useState(false);
   const [inquirySaving, setInquirySaving] = useState(false);
@@ -258,6 +282,11 @@ export default function AdminPage() {
       : cloneJson(defaultPortfolioContent.skills);
     setSkillDrafts(nextSkills);
   }, [content.skills, skillDirty]);
+
+  useEffect(() => {
+    if (profileDirty) return;
+    setProfileDraft(normalizeProfile(content.profile ?? defaultPortfolioContent.profile));
+  }, [content.profile, profileDirty]);
 
   useEffect(() => {
     const loadNotifications = async () => {
@@ -662,6 +691,130 @@ export default function AdminPage() {
   );
 
   const isReadOnlyUser = apiEnabled && (!user || user.role !== "admin");
+
+  const handleProfileChange = (patch) => {
+    setProfileDraft((prev) => ({
+      ...normalizeProfile(prev),
+      ...patch,
+    }));
+    setProfileDirty(true);
+    setProfileMessage({ tone: "neutral", text: "" });
+  };
+
+  const handleProfileSocialChange = (field, value) => {
+    setProfileDraft((prev) => {
+      const current = normalizeProfile(prev);
+      return {
+        ...current,
+        social: {
+          ...current.social,
+          [field]: String(value ?? ""),
+        },
+      };
+    });
+    setProfileDirty(true);
+    setProfileMessage({ tone: "neutral", text: "" });
+  };
+
+  const handleProfileUpload = async (field, file) => {
+    if (!file) return;
+
+    const isImageField = field === "aboutImageUrl" || field === "profileImageUrl";
+    if (isImageField && !String(file.type ?? "").startsWith("image/")) {
+      setProfileMessage({ tone: "error", text: "Please select an image file." });
+      return;
+    }
+
+    if (!apiEnabled) {
+      setProfileMessage({
+        tone: "warn",
+        text: "API disabled: set NEXT_PUBLIC_API_BASE_URL in frontend env for upload.",
+      });
+      return;
+    }
+
+    if (!token || user?.role !== "admin") {
+      setProfileMessage({ tone: "error", text: "Admin role is required for upload." });
+      return;
+    }
+
+    setProfileUploadingField(field);
+    setProfileMessage({ tone: "neutral", text: "Uploading file..." });
+    const response = await uploadAsset({ token, file });
+    setProfileUploadingField("");
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        clearAuthToken();
+        router.replace("/login");
+        return;
+      }
+      setProfileMessage({ tone: "error", text: response.data?.message || "Failed to upload file." });
+      return;
+    }
+
+    const uploadedUrl = String(response.data?.url ?? "").trim();
+    if (!uploadedUrl) {
+      setProfileMessage({ tone: "error", text: "Upload succeeded but no URL returned." });
+      return;
+    }
+
+    setProfileDraft((prev) => ({
+      ...normalizeProfile(prev),
+      [field]: uploadedUrl,
+    }));
+    setProfileDirty(true);
+    setProfileMessage({
+      tone: "success",
+      text: "File uploaded. Click Save Profile to publish.",
+    });
+  };
+
+  const handleProfileSave = async () => {
+    const payload = normalizeProfile(profileDraft);
+
+    if (!apiEnabled) {
+      setContent((prev) => ({ ...prev, profile: payload }));
+      setProfileDirty(false);
+      setProfileMessage({ tone: "success", text: "Profile saved in preview mode." });
+      return;
+    }
+
+    if (!token || user?.role !== "admin") {
+      setProfileMessage({ tone: "error", text: "Admin role is required to save profile." });
+      return;
+    }
+
+    setProfileSaving(true);
+    const response = await updateAdminContent({
+      token,
+      key: "profile",
+      data: payload,
+    });
+    setProfileSaving(false);
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        clearAuthToken();
+        router.replace("/login");
+        return;
+      }
+      const fieldMessage = response.data?.fieldErrors
+        ? Object.values(response.data.fieldErrors).join(" ")
+        : "";
+      setProfileMessage({
+        tone: "error",
+        text: fieldMessage || response.data?.message || "Failed to save profile settings.",
+      });
+      return;
+    }
+
+    const nextData = normalizeProfile(response.data?.data ?? payload);
+    setContent((prev) => ({ ...prev, profile: nextData }));
+    setProfileDraft(nextData);
+    setProfileDirty(false);
+    setProfileMessage({ tone: "success", text: "Profile settings updated successfully." });
+  };
 
   const handleProjectCreate = () => {
     const template = {
@@ -1314,7 +1467,8 @@ export default function AdminPage() {
     return null;
   }
 
-  const showRightPanel = activeView !== "inquiries" && activeView !== "messages";
+  const showRightPanel =
+    activeView !== "inquiries" && activeView !== "messages" && activeView !== "profile";
 
   return (
     <main className="h-screen overflow-hidden bg-[#05050a] text-slate-100">
@@ -1433,6 +1587,20 @@ export default function AdminPage() {
                 onOpenProjects={() => setActiveView("projects")}
                 onOpenMessages={() => setActiveView("messages")}
                 onOpenTechStack={() => setActiveView("tech-stack")}
+              />
+            ) : null}
+            {activeView === "profile" ? (
+              <ProfileView
+                profile={normalizeProfile(profileDraft)}
+                message={profileMessage}
+                dirty={profileDirty}
+                savePending={profileSaving}
+                isReadOnly={isReadOnlyUser}
+                uploadPendingField={profileUploadingField}
+                onChange={handleProfileChange}
+                onSocialChange={handleProfileSocialChange}
+                onUpload={handleProfileUpload}
+                onSave={handleProfileSave}
               />
             ) : null}
 

@@ -127,4 +127,16 @@ export const defaultPortfolioContent = {
     },
   ],
   contributions: [2, 5, 7, 4, 6, 10, 9, 11, 6, 7, 12, 10, 8, 11, 13, 9],
+  profile: {
+    aboutImageUrl: "/assets/about-portrait.png",
+    profileImageUrl: "",
+    resumeUrl: "",
+    social: {
+      linkedin: "https://www.linkedin.com",
+      github: "https://github.com",
+      telegram: "https://t.me",
+      gmail: "alexdeveloper@gmail.com",
+      location: "https://maps.google.com",
+    },
+  },
 };

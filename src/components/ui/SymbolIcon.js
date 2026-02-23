@@ -27,6 +27,7 @@ import {
   Lock,
   LoaderCircle,
   LogOut,
+  MapPin,
   MessageCircle,
   MoreVertical,
   Moon,
@@ -47,6 +48,7 @@ import {
   Eye,
   EyeOff,
   FileCode2,
+  Github,
   Menu,
   Mail,
   MailCheck,
@@ -64,6 +66,7 @@ import {
   Send,
   Server,
   Terminal,
+  Linkedin,
   Boxes,
 } from "lucide-react";
 
@@ -77,6 +80,9 @@ const ICON_MAP = {
   sync: LoaderCircle,
   view_in_ar: Boxes,
   mail: Mail,
+  github: Github,
+  linkedin: Linkedin,
+  location: MapPin,
   logout: LogOut,
   rocket_launch: Rocket,
   notifications: Bell,

@@ -2,7 +2,39 @@ import { defaultPortfolioContent } from "@/data/portfolioData";
 import HeroCubeScene from "@/components/three/HeroCubeScene";
 import SymbolIcon from "@/components/ui/SymbolIcon";
 
-export default function Hero({ data = defaultPortfolioContent.hero }) {
+const normalizeMailHref = (value) => {
+  const input = String(value ?? "").trim();
+  if (!input) return "";
+  if (input.startsWith("mailto:")) return input;
+  if (input.includes("@")) return `mailto:${input}`;
+  return input;
+};
+
+const normalizeProfile = (value) => {
+  const fallback = defaultPortfolioContent.profile ?? {};
+  const social = value?.social ?? {};
+  return {
+    linkedin: String(social?.linkedin ?? fallback?.social?.linkedin ?? ""),
+    github: String(social?.github ?? fallback?.social?.github ?? ""),
+    telegram: String(social?.telegram ?? fallback?.social?.telegram ?? ""),
+    gmail: normalizeMailHref(social?.gmail ?? fallback?.social?.gmail ?? ""),
+    location: String(social?.location ?? fallback?.social?.location ?? ""),
+  };
+};
+
+export default function Hero({
+  data = defaultPortfolioContent.hero,
+  profile = defaultPortfolioContent.profile,
+}) {
+  const social = normalizeProfile(profile);
+  const heroIcons = [
+    { key: "linkedin", href: social.linkedin || "https://www.linkedin.com", icon: "linkedin", label: "LinkedIn" },
+    { key: "github", href: social.github || "https://github.com", icon: "github", label: "GitHub" },
+    { key: "gmail", href: social.gmail || "mailto:alexdeveloper@gmail.com", icon: "mail", label: "Gmail" },
+    { key: "telegram", href: social.telegram || "https://t.me", icon: "send", label: "Telegram" },
+    { key: "location", href: social.location || "https://maps.google.com", icon: "location", label: "Location" },
+  ];
+
   return (
     <section id="home" className="relative flex min-h-[90vh] items-center justify-center overflow-hidden px-4 py-20">
       <div className="pointer-events-none absolute inset-0 opacity-30 hero-grid-bg" />
@@ -52,16 +84,23 @@ export default function Hero({ data = defaultPortfolioContent.hero }) {
             </a>
           </div>
 
-          <div className="flex items-center justify-center gap-8 pt-4 lg:justify-start">
-            <a className="text-slate-400 transition-all duration-300 hover:-translate-y-1 hover:text-[#00f0ff]" href="#">
-              <SymbolIcon name="code" className="h-8 w-8" />
-            </a>
-            <a className="text-slate-400 transition-all duration-300 hover:-translate-y-1 hover:text-[#00f0ff]" href="#">
-              <SymbolIcon name="work" className="h-8 w-8" />
-            </a>
-            <a className="text-slate-400 transition-all duration-300 hover:-translate-y-1 hover:text-[#00f0ff]" href="#">
-              <SymbolIcon name="alternate_email" className="h-8 w-8" />
-            </a>
+          <div className="flex items-center justify-center gap-6 pt-4 lg:justify-start">
+            {heroIcons.map((item) => {
+              const opensNewTab = !String(item.href).startsWith("mailto:");
+              return (
+                <a
+                  key={item.key}
+                  className="text-slate-400 transition-all duration-300 hover:-translate-y-1 hover:text-[#00f0ff]"
+                  href={item.href}
+                  target={opensNewTab ? "_blank" : undefined}
+                  rel={opensNewTab ? "noreferrer" : undefined}
+                  aria-label={item.label}
+                  title={item.label}
+                >
+                  <SymbolIcon name={item.icon} className="h-7 w-7" />
+                </a>
+              );
+            })}
           </div>
         </div>
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { navLinks } from "@/data/portfolioData";
+import { defaultPortfolioContent, navLinks } from "@/data/portfolioData";
 import SymbolIcon from "@/components/ui/SymbolIcon";
 import {
   deleteAdminChatThreadMessages,
@@ -27,6 +27,7 @@ import {
   initPushNotifications,
   requiresIosPwaForPush,
 } from "@/lib/pushNotifications";
+import { API_BASE_URL } from "@/lib/apiBase";
 import { useSmartChatScroll } from "@/hooks/useSmartChatScroll";
 import AdminChatView from "@/app/admin/views/AdminChatView";
 
@@ -37,6 +38,41 @@ const visibleNav = navLinks
 
 const GUEST_CHAT_KEY = "portfolio_guest_chat_history";
 const WELCOME_SESSION_KEY = "portfolio_chat_welcome_shown";
+
+const resolveAssetUrl = (value) => {
+  const input = String(value ?? "").trim();
+  if (!input) return "";
+  if (/^https?:\/\//i.test(input)) return input;
+  if (input.startsWith("/uploads/") && API_BASE_URL) {
+    return `${API_BASE_URL}${input}`;
+  }
+  return input;
+};
+
+const normalizeMailHref = (value) => {
+  const input = String(value ?? "").trim();
+  if (!input) return "";
+  if (input.startsWith("mailto:")) return input;
+  if (input.includes("@")) return `mailto:${input}`;
+  return input;
+};
+
+const normalizeProfile = (value) => {
+  const fallback = defaultPortfolioContent.profile ?? {};
+  const social = value?.social ?? {};
+  const resumeUrl = resolveAssetUrl(value?.resumeUrl ?? fallback?.resumeUrl ?? "");
+  return {
+    aboutImageUrl: resolveAssetUrl(value?.aboutImageUrl ?? fallback?.aboutImageUrl ?? ""),
+    profileImageUrl: resolveAssetUrl(value?.profileImageUrl ?? fallback?.profileImageUrl ?? ""),
+    resumeUrl,
+    social: {
+      linkedin: String(social?.linkedin ?? fallback?.social?.linkedin ?? ""),
+      github: String(social?.github ?? fallback?.social?.github ?? ""),
+      telegram: String(social?.telegram ?? fallback?.social?.telegram ?? ""),
+      gmail: normalizeMailHref(social?.gmail ?? fallback?.social?.gmail ?? ""),
+    },
+  };
+};
 
 const hasWelcomeShown = (key) => {
   if (typeof window === "undefined") return false;
@@ -228,7 +264,7 @@ const mapUserApiMessagesToPanel = (items) => {
   return { mapped, nextReactions };
 };
 
-export default function Header() {
+export default function Header({ profile = defaultPortfolioContent.profile }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [messageOpen, setMessageOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -268,6 +304,10 @@ export default function Header() {
   const adminChatViewRef = useRef("threads");
   const authUserIdRef = useRef("");
   const isAdmin = authUser?.role === "admin";
+  const profileSettings = useMemo(() => normalizeProfile(profile), [profile]);
+  const resumeHref = profileSettings.resumeUrl || "#contact";
+  const resumeOpensNewTab = Boolean(profileSettings.resumeUrl && !resumeHref.startsWith("#"));
+  const profileAvatarUrl = profileSettings.profileImageUrl;
 
   const nonEphemeralChatMessages = useMemo(
     () => chatMessages.filter((item) => !item.ephemeral),
@@ -1775,9 +1815,15 @@ export default function Header() {
                 </div>
 
                 <div className="mt-3 flex items-center gap-3 rounded-lg border border-white/10 bg-[#0d1222] p-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#00f0ff]/15 text-[#00f0ff]">
-                    <SymbolIcon name="person" className="h-5 w-5" />
-                  </div>
+                  {profileAvatarUrl ? (
+                    <div className="h-10 w-10 overflow-hidden rounded-full border border-[#00f0ff]/35 bg-[#0a0a12]">
+                      <img src={profileAvatarUrl} alt="Profile avatar" className="h-full w-full object-cover" />
+                    </div>
+                  ) : (
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#00f0ff]/15 text-[#00f0ff]">
+                      <SymbolIcon name="person" className="h-5 w-5" />
+                    </div>
+                  )}
                   <div>
                     <p className="text-sm font-semibold text-white">
                       {authUser?.name || "Alex Developer"}
@@ -1819,7 +1865,9 @@ export default function Header() {
             ) : null}
           </div>
           <a
-            href="#contact"
+            href={resumeHref}
+            target={resumeOpensNewTab ? "_blank" : undefined}
+            rel={resumeOpensNewTab ? "noreferrer" : undefined}
             className="group relative flex h-9 items-center justify-center overflow-hidden rounded-lg border border-[#00f0ff]/50 bg-transparent px-4 text-sm font-bold leading-none text-[#00f0ff] transition-all hover:bg-[#00f0ff]/10 hover:shadow-[0_0_15px_rgba(0,240,255,0.4)]"
           >
             <span className="absolute inset-0 h-full w-full -translate-x-full bg-gradient-to-r from-transparent via-[#00f0ff]/20 to-transparent group-hover:animate-[shimmer_1.5s_infinite]" />
@@ -2489,9 +2537,15 @@ export default function Header() {
 
             <div className="mt-5 rounded-xl border border-white/10 bg-[#0d1222] p-4">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#00f0ff]/15 text-[#00f0ff]">
-                  <SymbolIcon name="person" className="h-5 w-5" />
-                </div>
+                {profileAvatarUrl ? (
+                  <div className="h-10 w-10 overflow-hidden rounded-full border border-[#00f0ff]/35 bg-[#0a0a12]">
+                    <img src={profileAvatarUrl} alt="Profile avatar" className="h-full w-full object-cover" />
+                  </div>
+                ) : (
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#00f0ff]/15 text-[#00f0ff]">
+                    <SymbolIcon name="person" className="h-5 w-5" />
+                  </div>
+                )}
                 <div>
                   <p className="text-sm font-semibold text-white">
                     {authUser?.name || "Alex Developer"}
@@ -2552,7 +2606,9 @@ export default function Header() {
             </div>
 
             <a
-              href="#contact"
+              href={resumeHref}
+              target={resumeOpensNewTab ? "_blank" : undefined}
+              rel={resumeOpensNewTab ? "noreferrer" : undefined}
               onClick={() => setMobileOpen(false)}
               className="mt-4 flex items-center justify-center gap-2 rounded-xl border border-[#00f0ff]/40 bg-[#00f0ff]/10 px-4 py-3 text-sm font-semibold text-[#00f0ff] transition-all hover:bg-[#00f0ff]/20"
             >

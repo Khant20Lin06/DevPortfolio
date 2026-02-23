@@ -4,6 +4,8 @@ import SymbolIcon from "@/components/ui/SymbolIcon";
 const footerLinks = navLinks.filter((item) => ["home", "about", "projects", "contact"].includes(item.id));
 
 export default function Footer() {
+  const currentYear = new Date().getFullYear();
+
   return (
     <footer className="relative border-t border-white/5 bg-[#05050a] py-10">
       <div className="absolute left-1/2 top-0 h-px w-full -translate-x-1/2 bg-gradient-to-r from-transparent via-[#00f0ff]/50 to-transparent" />
@@ -29,7 +31,9 @@ export default function Footer() {
           ))}
         </div>
 
-        <p className="text-xs text-slate-600">(c) 2024 Alex Developer. All rights reserved.</p>
+        <p className="text-center text-xs text-slate-600 md:text-right">
+          (c) {currentYear} Alex Developer. All rights reserved.
+        </p>
       </div>
     </footer>
   );

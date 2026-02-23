@@ -62,9 +62,9 @@ export default function HomePage() {
 
   return (
     <main className="site-shell pt-20">
-      <Header />
-      <Hero data={content.hero} />
-      <About data={content.about} />
+      <Header profile={content.profile} />
+      <Hero data={content.hero} profile={content.profile} />
+      <About data={content.about} profile={content.profile} />
       <TechStack data={content.skills} />
       <Projects data={content.projects} />
       <Experience data={content.experience} />

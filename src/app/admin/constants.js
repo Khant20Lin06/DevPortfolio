@@ -1,5 +1,6 @@
 export const NAV_ITEMS = [
   { id: "dashboard", label: "Dashboard", icon: "dashboard", accent: "primary" },
+  { id: "profile", label: "Profile", icon: "person", accent: "secondary" },
   { id: "projects", label: "Projects", icon: "folder_open", accent: "primary" },
   { id: "messages", label: "Live Chat", icon: "message", accent: "primary" },
   { id: "tech-stack", label: "Tech Stack", icon: "memory", accent: "secondary" },
@@ -216,6 +217,7 @@ export const accentClass = {
 
 export const viewMeta = {
   dashboard: { title: "Content Manager", subtitle: "Portfolio overview and content controls." },
+  profile: { title: "Profile Settings", subtitle: "Manage avatar, about image, social links, and resume." },
   projects: { title: "Projects", subtitle: "Total: 12" },
   messages: { title: "Live Chat", subtitle: "Respond to realtime inquiries." },
   "tech-stack": { title: "Tech Stack Manager", subtitle: "Tune stacks, visibility, and proficiency." },

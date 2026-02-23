@@ -117,7 +117,11 @@ export default function Projects({ data = defaultPortfolioContent.projects }) {
     if (totalSlides <= 1 || isAutoPaused) return undefined;
     const timer = setInterval(() => {
       setAnimate(true);
-      setRenderIndex((prev) => prev + 1);
+      setRenderIndex((prev) => {
+        const maxIndex = totalSlides + 1;
+        if (prev >= maxIndex) return maxIndex;
+        return prev + 1;
+      });
     }, AUTO_CYCLE_MS);
     return () => clearInterval(timer);
   }, [isAutoPaused, totalSlides]);
@@ -125,13 +129,20 @@ export default function Projects({ data = defaultPortfolioContent.projects }) {
   const goToPrevious = useCallback(() => {
     if (totalSlides <= 1) return;
     setAnimate(true);
-    setRenderIndex((prev) => prev - 1);
+    setRenderIndex((prev) => {
+      if (prev <= 0) return 0;
+      return prev - 1;
+    });
   }, [totalSlides]);
 
   const goToNext = useCallback(() => {
     if (totalSlides <= 1) return;
     setAnimate(true);
-    setRenderIndex((prev) => prev + 1);
+    setRenderIndex((prev) => {
+      const maxIndex = totalSlides + 1;
+      if (prev >= maxIndex) return maxIndex;
+      return prev + 1;
+    });
   }, [totalSlides]);
 
   const goToSlide = useCallback(
@@ -155,6 +166,28 @@ export default function Projects({ data = defaultPortfolioContent.projects }) {
       setRenderIndex(1);
     }
   };
+
+  useEffect(() => {
+    if (totalSlides <= 1) return;
+    const maxIndex = totalSlides + 1;
+    if (renderIndex >= 0 && renderIndex <= maxIndex) return;
+
+    const normalized = ((renderIndex - 1) % totalSlides + totalSlides) % totalSlides;
+    setAnimate(false);
+    setRenderIndex(normalized + 1);
+  }, [renderIndex, totalSlides]);
+
+  useEffect(() => {
+    if (totalSlides <= 1 || !animate) return undefined;
+    if (renderIndex !== 0 && renderIndex !== totalSlides + 1) return undefined;
+
+    const timer = setTimeout(() => {
+      setAnimate(false);
+      setRenderIndex(renderIndex === 0 ? totalSlides : 1);
+    }, 820);
+
+    return () => clearTimeout(timer);
+  }, [animate, renderIndex, totalSlides]);
 
   const handlePointerDown = (event) => {
     if (event.pointerType === "mouse" && event.button !== 0) return;

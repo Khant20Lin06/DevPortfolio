@@ -1,9 +1,24 @@
-import Image from "next/image";
 import { defaultPortfolioContent } from "@/data/portfolioData";
+import { API_BASE_URL } from "@/lib/apiBase";
 
-export default function About({ data = defaultPortfolioContent.about }) {
+const resolveAssetUrl = (value) => {
+  const input = String(value ?? "").trim();
+  if (!input) return "";
+  if (/^https?:\/\//i.test(input)) return input;
+  if (input.startsWith("/uploads/") && API_BASE_URL) {
+    return `${API_BASE_URL}${input}`;
+  }
+  return input;
+};
+
+export default function About({
+  data = defaultPortfolioContent.about,
+  profile = defaultPortfolioContent.profile,
+}) {
   const firstStat = data.stats?.[0];
   const secondStat = data.stats?.[1];
+  const imageSrc = resolveAssetUrl(data.image || profile?.aboutImageUrl || "/assets/about-portrait.png");
+  const imageAlt = data.imageAlt || "Portrait of a developer looking focused in a dimly lit workspace";
 
   return (
     <section id="about" className="relative bg-[#0a0a12] py-24">
@@ -20,13 +35,7 @@ export default function About({ data = defaultPortfolioContent.about }) {
         <div className="grid items-center gap-16 md:grid-cols-2">
           <div className="group relative mx-auto w-[300px] md:w-[360px]">
             <div className="relative z-10 aspect-[4/5] overflow-hidden rounded-2xl border-2 border-white/10 bg-slate-800 shadow-2xl transition-transform duration-500 group-hover:[transform:rotateX(6deg)_rotateY(6deg)]">
-              <Image
-                src="/assets/about-portrait.png"
-                alt="Portrait of a developer looking focused in a dimly lit workspace"
-                fill
-                className="object-cover object-center"
-                sizes="(max-width: 768px) 80vw, 420px"
-              />
+              <img src={imageSrc} alt={imageAlt} className="h-full w-full object-cover object-center" />
               <div className="absolute inset-0 bg-gradient-to-t from-[#05050a]/90 to-transparent opacity-60" />
             </div>
             <div className="absolute -left-4 -top-4 -z-0 h-full w-full rounded-2xl border-2 border-[#00f0ff]/30 transition-transform duration-500 group-hover:-translate-x-[10px] group-hover:-translate-y-[10px]" />
