@@ -1,8 +1,9 @@
+import Link from "next/link";
 import SymbolIcon from "@/components/ui/SymbolIcon";
 import { NAV_ITEMS, accentClass } from "../constants";
 import { initials } from "../utils";
 
-export default function AdminSidebar({ activeView, onSelect, user, onLogout }) {
+export default function AdminSidebar({ activeView, onSelect, user, onLogout, navBadges = {} }) {
   return (
     <aside className="hidden h-full w-64 flex-shrink-0 flex-col border-r border-white/5 glass-panel lg:flex">
       <div className="flex items-center gap-3 border-b border-white/5 p-6">
@@ -17,17 +18,19 @@ export default function AdminSidebar({ activeView, onSelect, user, onLogout }) {
       </div>
 
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-6">
-        <a
+        <Link
           href="/"
           className="group flex w-full items-center gap-3 rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-sm font-medium text-slate-200 transition-colors hover:border-[#00f0ff]/40 hover:bg-white/10 hover:text-white"
         >
           <SymbolIcon name="arrow_back" className="h-[18px] w-[18px] text-[#00f0ff]" />
           <span>Back to Portfolio</span>
-        </a>
+        </Link>
 
         {NAV_ITEMS.map((item) => {
           const palette = accentClass[item.accent] ?? accentClass.primary;
           const selected = activeView === item.id;
+          const badgeValue = Number(navBadges[item.id] ?? 0);
+          const showDynamicBadge = Number.isFinite(badgeValue) && badgeValue > 0;
 
           return (
             <button
@@ -53,6 +56,12 @@ export default function AdminSidebar({ activeView, onSelect, user, onLogout }) {
               {item.helper?.kind === "badge" ? (
                 <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-[#ff003c] text-[10px] font-bold text-white">
                   {item.helper.label}
+                </span>
+              ) : null}
+
+              {showDynamicBadge ? (
+                <span className="ml-auto inline-flex min-w-[20px] items-center justify-center rounded-full bg-[#ff003c] px-1.5 py-0.5 text-[10px] font-bold text-white">
+                  {badgeValue > 99 ? "99+" : badgeValue}
                 </span>
               ) : null}
             </button>

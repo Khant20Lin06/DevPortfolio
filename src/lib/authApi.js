@@ -121,6 +121,35 @@ export const getAdminNotifications = (token) =>
     token,
   });
 
+export const getAdminInquiries = (token) =>
+  request({
+    path: "/api/v1/admin/inquiries",
+    token,
+  });
+
+export const createAdminInquiry = ({ token, payload }) =>
+  request({
+    path: "/api/v1/admin/inquiries",
+    method: "POST",
+    token,
+    body: payload,
+  });
+
+export const updateAdminInquiry = ({ token, inquiryId, payload }) =>
+  request({
+    path: `/api/v1/admin/inquiries/${encodeURIComponent(inquiryId)}`,
+    method: "PUT",
+    token,
+    body: payload,
+  });
+
+export const deleteAdminInquiry = ({ token, inquiryId }) =>
+  request({
+    path: `/api/v1/admin/inquiries/${encodeURIComponent(inquiryId)}`,
+    method: "DELETE",
+    token,
+  });
+
 export const getAdminPortfolioAnalytics = (token) =>
   request({
     path: "/api/v1/admin/analytics/portfolio",

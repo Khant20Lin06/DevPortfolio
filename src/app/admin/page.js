@@ -5,9 +5,12 @@ import { useRouter } from "next/navigation";
 import SymbolIcon from "@/components/ui/SymbolIcon";
 import {
   clearAuthToken,
+  createAdminInquiry,
   deleteAdminChatMessage,
+  deleteAdminInquiry,
   editAdminChatMessage,
   getAdminContent,
+  getAdminInquiries,
   getAdminPortfolioAnalytics,
   getAdminNotifications,
   getAdminChatMessages,
@@ -18,12 +21,13 @@ import {
   reactAdminChatMessage,
   sendAdminChatMessage,
   uploadAsset,
+  updateAdminInquiry,
   updateAdminContent,
 } from "@/lib/authApi";
 import { connectRealtime, disconnectRealtime } from "@/lib/realtime";
 import { getPushReasonHint, initPushNotifications } from "@/lib/pushNotifications";
 import { defaultPortfolioContent } from "@/data/portfolioData";
-import { HERO_PROJECTS, INQUIRIES, NAV_ITEMS } from "./constants";
+import { HERO_PROJECTS, NAV_ITEMS } from "./constants";
 import { cloneJson, ensureArray, prettyJson } from "./utils";
 import AdminSidebar from "./components/AdminSidebar";
 import AdminHeader from "./components/AdminHeader";
@@ -50,6 +54,40 @@ const normalizeProject = (project) => ({
     .filter(Boolean),
 });
 
+const normalizeSkillRow = (row) => ({
+  label: String(row?.label ?? ""),
+  level: Math.min(100, Math.max(0, Number(row?.level) || 0)),
+});
+
+const normalizeSkillGroup = (group) => ({
+  title: String(group?.title ?? ""),
+  accent: String(group?.accent ?? "#00dcff"),
+  rows: ensureArray(group?.rows).map(normalizeSkillRow),
+});
+
+const normalizeInquiry = (item) => {
+  const message = String(item?.message ?? item?.preview ?? "").trim();
+  const body = ensureArray(item?.body).length
+    ? ensureArray(item.body).map((line) => String(line))
+    : message
+      ? message.split(/\r?\n+/).filter(Boolean)
+      : [];
+
+  return {
+    id: String(item?.id ?? `${Date.now()}`),
+    sender: String(item?.sender ?? item?.name ?? "Visitor"),
+    email: String(item?.email ?? ""),
+    location: String(item?.location ?? "Portfolio Contact"),
+    subject: String(item?.subject ?? "Portfolio Contact Inquiry"),
+    preview: String(item?.preview ?? message),
+    message,
+    body,
+    tags: ensureArray(item?.tags).length ? ensureArray(item.tags) : ["New Contact"],
+    unread: item?.unread !== false,
+    createdAt: item?.createdAt ?? new Date().toISOString(),
+  };
+};
+
 export default function AdminPage() {
   const router = useRouter();
   const apiEnabled = useMemo(() => isAuthApiEnabled(), []);
@@ -66,7 +104,11 @@ export default function AdminPage() {
   const [editorMessage, setEditorMessage] = useState({ tone: "neutral", text: "" });
   const [contentLoading, setContentLoading] = useState(false);
   const [savePending, setSavePending] = useState(false);
-  const [selectedInquiryId, setSelectedInquiryId] = useState(INQUIRIES[0].id);
+  const [inquiries, setInquiries] = useState([]);
+  const [inquiriesLoading, setInquiriesLoading] = useState(false);
+  const [inquirySaving, setInquirySaving] = useState(false);
+  const [inquiryMessage, setInquiryMessage] = useState({ tone: "neutral", text: "" });
+  const [selectedInquiryId, setSelectedInquiryId] = useState("");
   const [projectDrafts, setProjectDrafts] = useState(() =>
     cloneJson(defaultPortfolioContent.projects)
   );
@@ -75,6 +117,10 @@ export default function AdminPage() {
   const [projectSaving, setProjectSaving] = useState(false);
   const [projectUploadingIndex, setProjectUploadingIndex] = useState(-1);
   const [projectMessage, setProjectMessage] = useState({ tone: "neutral", text: "" });
+  const [skillDrafts, setSkillDrafts] = useState(() => cloneJson(defaultPortfolioContent.skills));
+  const [skillDirty, setSkillDirty] = useState(false);
+  const [skillSaving, setSkillSaving] = useState(false);
+  const [skillMessage, setSkillMessage] = useState({ tone: "neutral", text: "" });
   const [notificationCount, setNotificationCount] = useState(0);
   const [latestNotice, setLatestNotice] = useState(null);
   const [notifications, setNotifications] = useState([]);
@@ -167,9 +213,12 @@ export default function AdminPage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
-    const view = params.get("view");
-    if (view) {
-      setActiveView(view);
+    const rawView = String(params.get("view") ?? "").trim();
+    if (rawView) {
+      const nextView = rawView === "project-editor" ? "projects" : rawView;
+      if (NAV_ITEMS.some((item) => item.id === nextView)) {
+        setActiveView(nextView);
+      }
     }
   }, []);
 
@@ -202,6 +251,15 @@ export default function AdminPage() {
   }, [content.projects, projectDirty]);
 
   useEffect(() => {
+    if (skillDirty) return;
+    const incoming = ensureArray(content.skills);
+    const nextSkills = incoming.length
+      ? cloneJson(incoming)
+      : cloneJson(defaultPortfolioContent.skills);
+    setSkillDrafts(nextSkills);
+  }, [content.skills, skillDirty]);
+
+  useEffect(() => {
     const loadNotifications = async () => {
       if (!apiEnabled || !token || user?.role !== "admin") return;
       const response = await getAdminNotifications(token);
@@ -213,6 +271,31 @@ export default function AdminPage() {
 
     void loadNotifications();
   }, [apiEnabled, token, user?.role]);
+
+  useEffect(() => {
+    const loadInquiries = async () => {
+      if (!apiEnabled || !token || user?.role !== "admin") return;
+      setInquiriesLoading(true);
+      const response = await getAdminInquiries(token);
+      setInquiriesLoading(false);
+      if (!response.ok) return;
+      const items = ensureArray(response.data?.inquiries).map(normalizeInquiry);
+      setInquiries(items);
+      if (!selectedInquiryId && items.length) {
+        setSelectedInquiryId(items[0].id);
+      }
+    };
+
+    void loadInquiries();
+  }, [apiEnabled, token, user?.role]);
+
+  useEffect(() => {
+    if (!inquiries.length) return;
+    const exists = inquiries.some((item) => item.id === selectedInquiryId);
+    if (!exists) {
+      setSelectedInquiryId(inquiries[0].id);
+    }
+  }, [inquiries, selectedInquiryId]);
 
   useEffect(() => {
     if (!apiEnabled || !token || user?.role !== "admin") return undefined;
@@ -239,10 +322,12 @@ export default function AdminPage() {
   }, [apiEnabled, token, user?.role]);
 
   useEffect(() => {
+    let cancelled = false;
+
     const loadThreads = async () => {
       if (!apiEnabled || !token || user?.role !== "admin") return;
       const response = await getAdminChatThreads(token);
-      if (!response.ok) return;
+      if (cancelled || !response.ok) return;
       const threads = Array.isArray(response.data?.threads) ? response.data.threads : [];
       setChatThreads(
         threads.map((thread) => ({
@@ -269,6 +354,14 @@ export default function AdminPage() {
     };
 
     void loadThreads();
+    const timer = setInterval(() => {
+      void loadThreads();
+    }, 10000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
   }, [apiEnabled, token, user?.role, chatActiveUserId]);
 
   useEffect(() => {
@@ -354,6 +447,19 @@ export default function AdminPage() {
         },
         ...prev,
       ]);
+    };
+
+    const handleContactNew = (payload) => {
+      const incoming = normalizeInquiry({
+        ...payload,
+        subject: "Portfolio Contact Inquiry",
+        location: "Portfolio Contact",
+        tags: ["New Contact"],
+        unread: true,
+      });
+
+      setInquiries((prev) => [incoming, ...prev.filter((item) => item.id !== incoming.id)]);
+      setSelectedInquiryId((prev) => prev || incoming.id);
     };
 
     const handleChatReceipt = (payload) => {
@@ -487,6 +593,7 @@ export default function AdminPage() {
     };
 
     socket.on("notification:new", handleNotification);
+    socket.on("contact:new", handleContactNew);
     socket.on("chat:message", handleChatMessage);
     socket.on("chat:receipt", handleChatReceipt);
     socket.on("chat:message_updated", handleChatUpdated);
@@ -497,6 +604,7 @@ export default function AdminPage() {
 
     return () => {
       socket.off("notification:new", handleNotification);
+      socket.off("contact:new", handleContactNew);
       socket.off("chat:message", handleChatMessage);
       socket.off("chat:receipt", handleChatReceipt);
       socket.off("chat:message_updated", handleChatUpdated);
@@ -528,9 +636,30 @@ export default function AdminPage() {
   }, [content.projects]);
 
   const skills = useMemo(() => {
-    const fromContent = ensureArray(content.skills);
-    return fromContent.length ? fromContent : ensureArray(defaultPortfolioContent.skills);
-  }, [content.skills]);
+    const fromDraft = ensureArray(skillDrafts);
+    return fromDraft.length ? fromDraft : ensureArray(defaultPortfolioContent.skills);
+  }, [skillDrafts]);
+
+  const totalSkillCount = useMemo(
+    () =>
+      skills.reduce((count, group) => count + ensureArray(group?.rows).length, 0),
+    [skills]
+  );
+
+  const chatUnreadCount = useMemo(
+    () =>
+      chatThreads.reduce(
+        (count, thread) =>
+          count + (thread?.senderRole === "user" && !thread?.seenAt ? 1 : 0),
+        0
+      ),
+    [chatThreads]
+  );
+
+  const inquiriesUnreadCount = useMemo(
+    () => inquiries.reduce((count, item) => count + (item?.unread ? 1 : 0), 0),
+    [inquiries]
+  );
 
   const isReadOnlyUser = apiEnabled && (!user || user.role !== "admin");
 
@@ -550,6 +679,167 @@ export default function AdminPage() {
     });
     setProjectDirty(true);
     setProjectMessage({ tone: "neutral", text: "" });
+  };
+
+  const handleSelectInquiry = (inquiryId) => {
+    setSelectedInquiryId(inquiryId);
+    setInquiryMessage({ tone: "neutral", text: "" });
+    setInquiries((prev) =>
+      prev.map((item) =>
+        item.id === inquiryId
+          ? {
+              ...item,
+              unread: false,
+              tags: ensureArray(item.tags).filter((tag) => tag !== "New Contact"),
+            }
+          : item
+      )
+    );
+  };
+
+  const handleCreateInquiry = async (payload) => {
+    const cleanPayload = {
+      name: String(payload?.name ?? "").trim(),
+      email: String(payload?.email ?? "").trim(),
+      message: String(payload?.message ?? "").trim(),
+    };
+
+    if (!apiEnabled) {
+      const local = normalizeInquiry({
+        id: `local-${Date.now()}`,
+        ...cleanPayload,
+        createdAt: new Date().toISOString(),
+      });
+      setInquiries((prev) => [local, ...prev]);
+      setSelectedInquiryId(local.id);
+      setInquiryMessage({ tone: "success", text: "Inquiry created in preview mode." });
+      return { ok: true, inquiry: local };
+    }
+
+    if (!token || user?.role !== "admin") {
+      setInquiryMessage({ tone: "error", text: "Admin role is required." });
+      return { ok: false, message: "Admin role is required." };
+    }
+
+    setInquirySaving(true);
+    const response = await createAdminInquiry({ token, payload: cleanPayload });
+    setInquirySaving(false);
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        clearAuthToken();
+        router.replace("/login");
+        return { ok: false, message: "Session expired." };
+      }
+      const fieldMessage = response.data?.fieldErrors
+        ? Object.values(response.data.fieldErrors).join(" ")
+        : "";
+      const message = fieldMessage || response.data?.message || "Failed to create inquiry.";
+      setInquiryMessage({ tone: "error", text: message });
+      return { ok: false, message };
+    }
+
+    const incoming = normalizeInquiry(response.data?.inquiry ?? cleanPayload);
+    setInquiries((prev) => [incoming, ...prev.filter((item) => item.id !== incoming.id)]);
+    setSelectedInquiryId(incoming.id);
+    setInquiryMessage({ tone: "success", text: "Inquiry created." });
+    return { ok: true, inquiry: incoming };
+  };
+
+  const handleUpdateInquiry = async (inquiryId, payload) => {
+    const cleanPayload = {
+      name: String(payload?.name ?? "").trim(),
+      email: String(payload?.email ?? "").trim(),
+      message: String(payload?.message ?? "").trim(),
+    };
+
+    if (!inquiryId) {
+      const message = "Inquiry id is required.";
+      setInquiryMessage({ tone: "error", text: message });
+      return { ok: false, message };
+    }
+
+    if (!apiEnabled) {
+      setInquiries((prev) =>
+        prev.map((item) =>
+          item.id === inquiryId ? normalizeInquiry({ ...item, ...cleanPayload }) : item
+        )
+      );
+      setInquiryMessage({ tone: "success", text: "Inquiry updated in preview mode." });
+      return { ok: true };
+    }
+
+    if (!token || user?.role !== "admin") {
+      const message = "Admin role is required.";
+      setInquiryMessage({ tone: "error", text: message });
+      return { ok: false, message };
+    }
+
+    setInquirySaving(true);
+    const response = await updateAdminInquiry({
+      token,
+      inquiryId,
+      payload: cleanPayload,
+    });
+    setInquirySaving(false);
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        clearAuthToken();
+        router.replace("/login");
+        return { ok: false, message: "Session expired." };
+      }
+      const fieldMessage = response.data?.fieldErrors
+        ? Object.values(response.data.fieldErrors).join(" ")
+        : "";
+      const message = fieldMessage || response.data?.message || "Failed to update inquiry.";
+      setInquiryMessage({ tone: "error", text: message });
+      return { ok: false, message };
+    }
+
+    const incoming = normalizeInquiry(response.data?.inquiry ?? { id: inquiryId, ...cleanPayload });
+    setInquiries((prev) => prev.map((item) => (item.id === inquiryId ? incoming : item)));
+    setInquiryMessage({ tone: "success", text: "Inquiry updated." });
+    return { ok: true, inquiry: incoming };
+  };
+
+  const handleDeleteInquiry = async (inquiryId) => {
+    if (!inquiryId) {
+      const message = "Inquiry id is required.";
+      setInquiryMessage({ tone: "error", text: message });
+      return { ok: false, message };
+    }
+
+    if (!apiEnabled) {
+      setInquiries((prev) => prev.filter((item) => item.id !== inquiryId));
+      setInquiryMessage({ tone: "success", text: "Inquiry deleted in preview mode." });
+      return { ok: true };
+    }
+
+    if (!token || user?.role !== "admin") {
+      const message = "Admin role is required.";
+      setInquiryMessage({ tone: "error", text: message });
+      return { ok: false, message };
+    }
+
+    setInquirySaving(true);
+    const response = await deleteAdminInquiry({ token, inquiryId });
+    setInquirySaving(false);
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        clearAuthToken();
+        router.replace("/login");
+        return { ok: false, message: "Session expired." };
+      }
+      const message = response.data?.message || "Failed to delete inquiry.";
+      setInquiryMessage({ tone: "error", text: message });
+      return { ok: false, message };
+    }
+
+    setInquiries((prev) => prev.filter((item) => item.id !== inquiryId));
+    setInquiryMessage({ tone: "success", text: "Inquiry deleted." });
+    return { ok: true };
   };
 
   const handleProjectChange = (index, patch) => {
@@ -628,6 +918,114 @@ export default function AdminPage() {
       tone: "success",
       text: "Image uploaded. Click Save Changes to publish.",
     });
+  };
+
+  const handleSkillGroupCreate = () => {
+    const nextGroup = {
+      title: "New Group",
+      accent: "#00dcff",
+      rows: [{ label: "New Skill", level: 60 }],
+    };
+    setSkillDrafts((prev) => [...ensureArray(prev), nextGroup]);
+    setSkillDirty(true);
+    setSkillMessage({ tone: "neutral", text: "" });
+  };
+
+  const handleSkillGroupChange = (groupIndex, patch) => {
+    setSkillDrafts((prev) => {
+      const next = cloneJson(prev);
+      const current = normalizeSkillGroup(next[groupIndex]);
+      next[groupIndex] = { ...current, ...patch };
+      return next;
+    });
+    setSkillDirty(true);
+  };
+
+  const handleSkillGroupDelete = (groupIndex) => {
+    setSkillDrafts((prev) => ensureArray(prev).filter((_, index) => index !== groupIndex));
+    setSkillDirty(true);
+  };
+
+  const handleSkillCreate = (groupIndex) => {
+    setSkillDrafts((prev) => {
+      const next = cloneJson(prev);
+      const current = normalizeSkillGroup(next[groupIndex]);
+      const rows = [...ensureArray(current.rows), { label: "New Skill", level: 50 }];
+      next[groupIndex] = { ...current, rows };
+      return next;
+    });
+    setSkillDirty(true);
+  };
+
+  const handleSkillChange = (groupIndex, rowIndex, patch) => {
+    setSkillDrafts((prev) => {
+      const next = cloneJson(prev);
+      const current = normalizeSkillGroup(next[groupIndex]);
+      const rows = ensureArray(current.rows).map((row, index) =>
+        index === rowIndex ? { ...normalizeSkillRow(row), ...patch } : normalizeSkillRow(row)
+      );
+      next[groupIndex] = { ...current, rows };
+      return next;
+    });
+    setSkillDirty(true);
+  };
+
+  const handleSkillDelete = (groupIndex, rowIndex) => {
+    setSkillDrafts((prev) => {
+      const next = cloneJson(prev);
+      const current = normalizeSkillGroup(next[groupIndex]);
+      const rows = ensureArray(current.rows).filter((_, index) => index !== rowIndex);
+      next[groupIndex] = { ...current, rows };
+      return next;
+    });
+    setSkillDirty(true);
+  };
+
+  const handleSkillsSave = async () => {
+    const payload = ensureArray(skillDrafts)
+      .map(normalizeSkillGroup)
+      .filter((group) => group.title || ensureArray(group.rows).length);
+
+    if (!apiEnabled) {
+      setContent((prev) => ({ ...prev, skills: payload }));
+      setSkillDirty(false);
+      setSkillMessage({ tone: "success", text: "Skills saved in preview mode." });
+      return;
+    }
+
+    if (!token || user?.role !== "admin") {
+      setSkillMessage({ tone: "error", text: "Admin role is required to save skills." });
+      return;
+    }
+
+    setSkillSaving(true);
+    const response = await updateAdminContent({
+      token,
+      key: "skills",
+      data: payload,
+    });
+    setSkillSaving(false);
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        clearAuthToken();
+        router.replace("/login");
+        return;
+      }
+      const fieldMessage = response.data?.fieldErrors
+        ? Object.values(response.data.fieldErrors).join(" ")
+        : "";
+      setSkillMessage({
+        tone: "error",
+        text: fieldMessage || response.data?.message || "Failed to save skills.",
+      });
+      return;
+    }
+
+    const nextData = response.data?.data ?? payload;
+    setContent((prev) => ({ ...prev, skills: nextData }));
+    setSkillDirty(false);
+    setSkillMessage({ tone: "success", text: "Tech stack updated successfully." });
   };
 
   const handleAdminChatSend = async (userId, message) => {
@@ -916,19 +1314,23 @@ export default function AdminPage() {
     return null;
   }
 
-  const showRightPanel =
-    activeView !== "inquiries" && activeView !== "project-editor" && activeView !== "messages";
+  const showRightPanel = activeView !== "inquiries" && activeView !== "messages";
 
   return (
     <main className="h-screen overflow-hidden bg-[#05050a] text-slate-100">
       <div className="flex h-full">
-        <AdminSidebar activeView={activeView} onSelect={setActiveView} user={user} onLogout={handleLogout} />
+        <AdminSidebar
+          activeView={activeView}
+          onSelect={setActiveView}
+          user={user}
+          onLogout={handleLogout}
+          navBadges={{ messages: chatUnreadCount, inquiries: inquiriesUnreadCount }}
+        />
 
         <div className="flex flex-1 min-w-0">
           <section className="flex flex-col flex-1 min-w-0 overflow-hidden">
             <AdminHeader
               activeView={activeView}
-              setActiveView={setActiveView}
               onSaveContent={handleSaveContent}
               savePending={savePending}
               selectedKey={selectedKey}
@@ -936,6 +1338,10 @@ export default function AdminPage() {
               onSaveProjects={handleProjectsSave}
               projectsSavePending={projectSaving}
               projectsDirty={projectDirty}
+              onCreateSkillGroup={handleSkillGroupCreate}
+              onSaveSkills={handleSkillsSave}
+              skillsSavePending={skillSaving}
+              skillsDirty={skillDirty}
               isReadOnlyUser={isReadOnlyUser}
               notificationCount={notificationCount}
               onToggleNotifications={handleToggleNotifications}
@@ -958,6 +1364,16 @@ export default function AdminPage() {
             ) : null}
 
             <div className="px-4 py-2 text-xs border-b border-white/5 text-slate-500 lg:hidden">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => router.push("/")}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-2.5 py-1.5 text-[11px] font-semibold text-slate-200 transition-colors hover:border-[#00f0ff]/40 hover:text-white"
+                >
+                  <SymbolIcon name="arrow_back" className="h-3.5 w-3.5 text-[#00f0ff]" />
+                  Back to Portfolio
+                </button>
+              </div>
               <div className="flex gap-2 overflow-x-auto hide-scrollbar">
                 {NAV_ITEMS.map((item) => (
                   <button
@@ -971,6 +1387,16 @@ export default function AdminPage() {
                     }`}
                   >
                     {item.label}
+                    {item.id === "messages" && chatUnreadCount > 0 ? (
+                      <span className="ml-1 inline-flex min-w-[16px] items-center justify-center rounded-full bg-[#ff003c] px-1 text-[10px] font-bold text-white">
+                        {chatUnreadCount > 99 ? "99+" : chatUnreadCount}
+                      </span>
+                    ) : null}
+                    {item.id === "inquiries" && inquiriesUnreadCount > 0 ? (
+                      <span className="ml-1 inline-flex min-w-[16px] items-center justify-center rounded-full bg-[#ff003c] px-1 text-[10px] font-bold text-white">
+                        {inquiriesUnreadCount > 99 ? "99+" : inquiriesUnreadCount}
+                      </span>
+                    ) : null}
                   </button>
                 ))}
               </div>
@@ -993,6 +1419,8 @@ export default function AdminPage() {
               <DashboardView
                 projects={projects}
                 totalPortfolioViews={totalPortfolioViews}
+                chatUnreadCount={chatUnreadCount}
+                totalSkillCount={totalSkillCount}
                 keys={keys}
                 selectedKey={selectedKey}
                 setSelectedKey={setSelectedKey}
@@ -1002,10 +1430,13 @@ export default function AdminPage() {
                 savePending={savePending || isReadOnlyUser}
                 editorMessage={editorMessage}
                 contentLoading={contentLoading}
+                onOpenProjects={() => setActiveView("projects")}
+                onOpenMessages={() => setActiveView("messages")}
+                onOpenTechStack={() => setActiveView("tech-stack")}
               />
             ) : null}
 
-            {activeView === "projects" || activeView === "project-editor" ? (
+            {activeView === "projects" ? (
               <ProjectsView
                 projects={projectDrafts}
                 selectedIndex={projectSelectedIndex}
@@ -1039,11 +1470,34 @@ export default function AdminPage() {
             {activeView === "assets" ? <AssetsView /> : null}
             {activeView === "inquiries" ? (
               <InquiriesView
+                inquiries={inquiries}
+                loading={inquiriesLoading}
+                saving={inquirySaving}
+                crudMessage={inquiryMessage}
                 selectedInquiryId={selectedInquiryId}
                 setSelectedInquiryId={setSelectedInquiryId}
+                onSelectInquiry={handleSelectInquiry}
+                onCreateInquiry={handleCreateInquiry}
+                onUpdateInquiry={handleUpdateInquiry}
+                onDeleteInquiry={handleDeleteInquiry}
               />
             ) : null}
-            {activeView === "tech-stack" ? <TechStackView skills={skills} /> : null}
+            {activeView === "tech-stack" ? (
+              <TechStackView
+                skills={skills}
+                onGroupCreate={handleSkillGroupCreate}
+                onGroupChange={handleSkillGroupChange}
+                onGroupDelete={handleSkillGroupDelete}
+                onSkillCreate={handleSkillCreate}
+                onSkillChange={handleSkillChange}
+                onSkillDelete={handleSkillDelete}
+                onSaveSkills={handleSkillsSave}
+                savePending={skillSaving}
+                dirty={skillDirty}
+                isReadOnly={isReadOnlyUser}
+                message={skillMessage}
+              />
+            ) : null}
             {activeView === "github-sync" ? <GithubSyncView projects={projects} /> : null}
           </section>
 

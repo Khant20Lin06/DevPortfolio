@@ -73,12 +73,33 @@ export default function Projects({ data = defaultPortfolioContent.projects }) {
   const [renderIndex, setRenderIndex] = useState(totalSlides > 1 ? 1 : 0);
   const [animate, setAnimate] = useState(true);
   const [isAutoPaused, setIsAutoPaused] = useState(false);
+  const [touchActiveCardKey, setTouchActiveCardKey] = useState("");
+  const [canUseHover, setCanUseHover] = useState(true);
   const swipeStartXRef = useRef(null);
+  const didSwipeRef = useRef(false);
 
   useEffect(() => {
     setAnimate(true);
     setRenderIndex(totalSlides > 1 ? 1 : 0);
   }, [totalSlides]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+      return undefined;
+    }
+
+    const mediaQuery = window.matchMedia("(hover: hover) and (pointer: fine)");
+    const apply = () => {
+      setCanUseHover(mediaQuery.matches);
+      if (mediaQuery.matches) {
+        setTouchActiveCardKey("");
+      }
+    };
+
+    apply();
+    mediaQuery.addEventListener("change", apply);
+    return () => mediaQuery.removeEventListener("change", apply);
+  }, []);
 
   useEffect(() => {
     if (animate) return undefined;
@@ -87,6 +108,10 @@ export default function Projects({ data = defaultPortfolioContent.projects }) {
     });
     return () => cancelAnimationFrame(raf);
   }, [animate]);
+
+  useEffect(() => {
+    setTouchActiveCardKey("");
+  }, [renderIndex]);
 
   useEffect(() => {
     if (totalSlides <= 1 || isAutoPaused) return undefined;
@@ -144,6 +169,7 @@ export default function Projects({ data = defaultPortfolioContent.projects }) {
     }
     const deltaX = event.clientX - startX;
     if (Math.abs(deltaX) >= SWIPE_THRESHOLD_PX) {
+      didSwipeRef.current = true;
       if (deltaX > 0) {
         goToPrevious();
       } else {
@@ -154,6 +180,15 @@ export default function Projects({ data = defaultPortfolioContent.projects }) {
 
   const handlePointerCancel = () => {
     swipeStartXRef.current = null;
+  };
+
+  const handleCardTap = (cardKey) => {
+    if (canUseHover) return;
+    if (didSwipeRef.current) {
+      didSwipeRef.current = false;
+      return;
+    }
+    setTouchActiveCardKey((prev) => (prev === cardKey ? "" : cardKey));
   };
 
   const activeSlide = getRealSlideIndex(renderIndex, totalSlides);
@@ -194,13 +229,16 @@ export default function Projects({ data = defaultPortfolioContent.projects }) {
                     const githubUrl = toExternalUrl(project?.githubUrl);
                     const liveDemoUrl = toExternalUrl(project?.liveDemoUrl);
                     const tagList = Array.isArray(project?.tags) ? project.tags : [];
+                    const cardKey = `${project.title || "project"}-${globalIndex}`;
+                    const isTouchActive = !canUseHover && touchActiveCardKey === cardKey;
                     const hoverColor = isSecondary
                       ? "hover:shadow-[0_0_30px_rgba(112,0,255,0.15)] hover:border-[#7000ff]/50"
                       : "hover:shadow-[0_0_30px_rgba(0,240,255,0.15)] hover:border-[#00f0ff]/50";
 
                     return (
                       <article
-                        key={`${project.title}-${globalIndex}`}
+                        key={cardKey}
+                        onClick={() => handleCardTap(cardKey)}
                         className={`card-3d group relative flex h-full min-h-[390px] flex-col overflow-hidden rounded-2xl border border-white/5 bg-[#0a0a12]/40 backdrop-blur-sm transition-all duration-500 ${hoverColor}`}
                       >
                         <div className="relative aspect-video overflow-hidden rounded-t-2xl bg-slate-800">
@@ -208,16 +246,23 @@ export default function Projects({ data = defaultPortfolioContent.projects }) {
                             src={resolveProjectImageUrl(project.image)}
                             alt={project.title}
                             loading="lazy"
-                            className="h-full w-full object-cover object-center transition-transform duration-700 group-hover:scale-110"
+                            className={`h-full w-full object-cover object-center transition-transform duration-700 ${
+                              isTouchActive ? "scale-110" : "scale-100"
+                            } group-hover:scale-110`}
                           />
 
-                          <div className="absolute inset-0 flex items-center justify-center gap-4 bg-[#05050a]/80 opacity-0 backdrop-blur-sm transition-opacity duration-300 group-hover:opacity-100">
+                          <div
+                            className={`absolute inset-0 flex items-center justify-center gap-4 bg-[#05050a]/80 backdrop-blur-sm transition-opacity duration-300 group-hover:opacity-100 ${
+                              isTouchActive ? "opacity-100" : "opacity-0"
+                            }`}
+                          >
                             {githubUrl ? (
                               <a
                                 href={githubUrl}
                                 target="_blank"
                                 rel="noreferrer noopener"
                                 title="View Code"
+                                onClick={(event) => event.stopPropagation()}
                                 className={`transform rounded-full p-3 font-bold transition-all hover:scale-110 ${
                                   isSecondary
                                     ? "bg-[#7000ff] text-white shadow-[0_0_15px_rgba(112,0,255,0.6)] hover:bg-white hover:text-black"
@@ -231,6 +276,7 @@ export default function Projects({ data = defaultPortfolioContent.projects }) {
                                 type="button"
                                 title="GitHub URL not set"
                                 disabled
+                                onClick={(event) => event.stopPropagation()}
                                 className="rounded-full bg-white/10 p-3 text-slate-500"
                               >
                                 <SymbolIcon name="code" className="h-5 w-5" strokeWidth={2.4} />
@@ -243,6 +289,7 @@ export default function Projects({ data = defaultPortfolioContent.projects }) {
                                 target="_blank"
                                 rel="noreferrer noopener"
                                 title="Live Demo"
+                                onClick={(event) => event.stopPropagation()}
                                 className={`transform rounded-full bg-white p-3 text-[#05050a] transition-all shadow-[0_0_15px_rgba(255,255,255,0.4)] hover:scale-110 ${
                                   isSecondary
                                     ? "hover:bg-[#00f0ff] hover:text-black"
@@ -256,6 +303,7 @@ export default function Projects({ data = defaultPortfolioContent.projects }) {
                                 type="button"
                                 title="Live demo URL not set"
                                 disabled
+                                onClick={(event) => event.stopPropagation()}
                                 className="rounded-full bg-white/10 p-3 text-slate-500"
                               >
                                 <SymbolIcon name="visibility" className="h-5 w-5" strokeWidth={2.2} />
@@ -267,7 +315,9 @@ export default function Projects({ data = defaultPortfolioContent.projects }) {
                         <div className="flex h-full flex-1 flex-col p-6">
                           <h4
                             className={`mb-2 text-xl font-bold text-white transition-colors ${
-                              isSecondary ? "group-hover:text-[#7000ff]" : "group-hover:text-[#00f0ff]"
+                              isSecondary
+                                ? `${isTouchActive ? "text-[#7000ff]" : ""} group-hover:text-[#7000ff]`
+                                : `${isTouchActive ? "text-[#00f0ff]" : ""} group-hover:text-[#00f0ff]`
                             }`}
                           >
                             {project.title}

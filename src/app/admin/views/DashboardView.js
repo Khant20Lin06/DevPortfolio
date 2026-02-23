@@ -1,10 +1,23 @@
 import SymbolIcon from "@/components/ui/SymbolIcon";
 import { ASSET_LIBRARY } from "../constants";
 import { tagLetters } from "../utils";
+import { API_BASE_URL } from "@/lib/apiBase";
+
+const resolveImageUrl = (imageUrl) => {
+  const value = String(imageUrl ?? "").trim();
+  if (!value) return "/assets/project-shot-1.png";
+  if (/^https?:\/\//i.test(value)) return value;
+  if (value.startsWith("/uploads/") && API_BASE_URL) {
+    return `${API_BASE_URL}${value}`;
+  }
+  return value;
+};
 
 export default function DashboardView({
   projects,
   totalPortfolioViews,
+  chatUnreadCount,
+  totalSkillCount,
   keys,
   selectedKey,
   setSelectedKey,
@@ -14,8 +27,13 @@ export default function DashboardView({
   savePending,
   editorMessage,
   contentLoading,
+  onOpenProjects,
+  onOpenMessages,
+  onOpenTechStack,
 }) {
   const totalViews = Number.isFinite(totalPortfolioViews) ? totalPortfolioViews : 0;
+  const unreadChats = Number.isFinite(chatUnreadCount) ? chatUnreadCount : 0;
+  const skills = Number.isFinite(totalSkillCount) ? totalSkillCount : 0;
 
   return (
     <div className="flex-1 space-y-6 overflow-y-auto p-6">
@@ -39,41 +57,40 @@ export default function DashboardView({
 
         <div className="relative overflow-hidden rounded-xl border border-white/5 glass-panel p-5">
           <div className="absolute right-4 top-4 opacity-15">
-            <SymbolIcon name="mail" className="h-12 w-12 text-[#7000ff]" />
+            <SymbolIcon name="message" className="h-12 w-12 text-[#7000ff]" />
           </div>
-          <p className="text-sm text-slate-400">New Inquiries</p>
+          <p className="text-sm text-slate-400">Live Chat Unread</p>
           <div className="mt-2 flex items-end gap-2">
-            <span className="text-3xl font-bold text-white">18</span>
-            <span className="mb-1 text-xs text-slate-500">this week</span>
+            <span className="text-3xl font-bold text-white">{unreadChats}</span>
+            <span className="mb-1 text-xs text-slate-500">active threads</span>
           </div>
-          <div className="mt-4 flex -space-x-2">
-            <span className="h-6 w-6 rounded-full border border-[#0a0a12] bg-slate-700" />
-            <span className="h-6 w-6 rounded-full border border-[#0a0a12] bg-slate-600" />
-            <span className="h-6 w-6 rounded-full border border-[#0a0a12] bg-slate-500" />
-            <span className="flex h-6 w-6 items-center justify-center rounded-full border border-[#0a0a12] bg-slate-800 text-[9px] text-white">
-              +15
-            </span>
-          </div>
+          <button
+            type="button"
+            onClick={onOpenMessages}
+            className="mt-4 inline-flex items-center gap-2 rounded border border-[#7000ff]/30 bg-[#7000ff]/10 px-2.5 py-1 text-xs text-[#b794ff] transition-colors hover:bg-[#7000ff]/20"
+          >
+            Open Live Chat
+            <SymbolIcon name="arrow_forward" className="h-3.5 w-3.5" />
+          </button>
         </div>
 
         <div className="relative overflow-hidden rounded-xl border border-white/5 glass-panel p-5">
           <div className="absolute right-4 top-4 opacity-15">
-            <SymbolIcon name="code" className="h-12 w-12 text-[#ff003c]" />
+            <SymbolIcon name="memory" className="h-12 w-12 text-[#ff003c]" />
           </div>
-          <p className="text-sm text-slate-400">GitHub Activity</p>
+          <p className="text-sm text-slate-400">Total Skills</p>
           <div className="mt-2 flex items-end gap-2">
-            <span className="text-3xl font-bold text-white">1,240</span>
-            <span className="mb-1 text-xs font-semibold text-green-400">contributions</span>
+            <span className="text-3xl font-bold text-white">{skills}</span>
+            <span className="mb-1 text-xs font-semibold text-green-400">configured</span>
           </div>
-          <div className="mt-4 flex h-3 items-end gap-1">
-            {[3, 5, 8, 10, 6, 4, 7, 9].map((value) => (
-              <span
-                key={value}
-                className="w-1 rounded-sm bg-green-400/80"
-                style={{ height: `${value * 10}%` }}
-              />
-            ))}
-          </div>
+          <button
+            type="button"
+            onClick={onOpenTechStack}
+            className="mt-4 inline-flex items-center gap-2 rounded border border-[#ff003c]/30 bg-[#ff003c]/10 px-2.5 py-1 text-xs text-[#ff5b80] transition-colors hover:bg-[#ff003c]/20"
+          >
+            Manage Tech Stack
+            <SymbolIcon name="arrow_forward" className="h-3.5 w-3.5" />
+          </button>
         </div>
       </div>
 
@@ -82,10 +99,11 @@ export default function DashboardView({
           <h3 className="text-lg font-bold text-white">Featured Projects</h3>
           <button
             type="button"
+            onClick={onOpenProjects}
             className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#0a0a12] px-3 py-1.5 text-xs transition-colors hover:border-[#00f0ff]/40 hover:text-[#00f0ff]"
           >
             <SymbolIcon name="add" className="h-4 w-4" />
-            Add New
+            Open Projects Editor
           </button>
         </div>
         <div className="overflow-x-auto">
@@ -112,7 +130,7 @@ export default function DashboardView({
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-3">
                       <img
-                        src={project.image}
+                        src={resolveImageUrl(project.image)}
                         alt={project.title}
                         className="h-10 w-10 rounded border border-white/10 object-cover"
                       />
@@ -132,7 +150,7 @@ export default function DashboardView({
                   </td>
                   <td className="px-5 py-4">
                     <div className="flex -space-x-1">
-                      {project.tags.map((tag) => (
+                      {(Array.isArray(project.tags) ? project.tags : []).map((tag) => (
                         <span
                           key={`${project.title}-${tag}`}
                           className="flex h-6 w-6 items-center justify-center rounded-full border border-white/10 bg-[#0a0a12] text-[10px] text-white"
@@ -147,6 +165,7 @@ export default function DashboardView({
                   <td className="px-5 py-4 text-right">
                     <button
                       type="button"
+                      onClick={onOpenProjects}
                       className="rounded p-1.5 text-slate-400 transition-colors hover:bg-white/10 hover:text-[#00f0ff]"
                     >
                       <SymbolIcon name="edit" className="h-4 w-4" />

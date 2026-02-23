@@ -3,7 +3,6 @@ import { viewMeta } from "../constants";
 
 export default function AdminHeader({
   activeView,
-  setActiveView,
   onSaveContent,
   savePending,
   selectedKey,
@@ -11,6 +10,10 @@ export default function AdminHeader({
   onSaveProjects,
   projectsSavePending,
   projectsDirty,
+  onCreateSkillGroup,
+  onSaveSkills,
+  skillsSavePending,
+  skillsDirty,
   isReadOnlyUser,
   notificationCount = 0,
   onToggleNotifications,
@@ -22,17 +25,6 @@ export default function AdminHeader({
   return (
     <header className="flex h-16 flex-shrink-0 items-center justify-between border-b border-white/5 px-6 glass-panel">
       <div className="flex items-center gap-4">
-        {activeView === "project-editor" ? (
-          <button
-            type="button"
-            className="text-slate-400 transition-colors hover:text-white"
-            onClick={() => setActiveView("projects")}
-            aria-label="Back to projects"
-          >
-            <SymbolIcon name="arrow_back" className="h-5 w-5" />
-          </button>
-        ) : null}
-
         <div>
           <h2 className="text-xl font-bold text-white">{meta.title}</h2>
           <p className="text-xs text-slate-500">{meta.subtitle}</p>
@@ -50,28 +42,6 @@ export default function AdminHeader({
             <SymbolIcon name="rocket_launch" className="h-4 w-4" />
             {savePending ? "Saving..." : `Deploy ${selectedKey}`}
           </button>
-        ) : null}
-
-        {activeView === "project-editor" ? (
-          <>
-            <span className="inline-flex items-center gap-1 rounded-full border border-yellow-400/20 bg-yellow-500/10 px-3 py-1 text-xs text-yellow-300">
-              <span className="h-1.5 w-1.5 rounded-full bg-yellow-400" />
-              Draft
-            </span>
-            <button
-              type="button"
-              className="rounded-lg border border-white/10 bg-[#13131f] px-4 py-2 text-sm font-medium text-slate-300 transition-colors hover:text-white"
-            >
-              Preview
-            </button>
-            <button
-              type="button"
-              className="inline-flex items-center gap-2 rounded-lg bg-[#00f0ff] px-4 py-2 text-sm font-bold text-[#05050a] shadow-[0_0_15px_rgba(0,240,255,0.3)] transition-all hover:bg-[#00e2ef]"
-            >
-              <SymbolIcon name="save" className="h-4 w-4" />
-              Save Changes
-            </button>
-          </>
         ) : null}
 
         {activeView === "projects" ? (
@@ -134,13 +104,26 @@ export default function AdminHeader({
         ) : null}
 
         {activeView === "tech-stack" ? (
-          <button
-            type="button"
-            className="inline-flex items-center gap-2 rounded bg-[#00f0ff] px-3 py-1.5 text-xs font-bold text-[#05050a] shadow-[0_0_15px_rgba(0,240,255,0.3)] transition-all hover:bg-[#00e2ef]"
-          >
-            <SymbolIcon name="add" className="h-4 w-4" />
-            Add New Skill
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={onCreateSkillGroup}
+              disabled={isReadOnlyUser}
+              className="inline-flex items-center gap-2 rounded border border-[#00f0ff]/30 bg-[#00f0ff]/10 px-3 py-1.5 text-xs font-bold text-[#00f0ff] transition-all hover:bg-[#00f0ff]/20 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <SymbolIcon name="add" className="h-4 w-4" />
+              Add Group
+            </button>
+            <button
+              type="button"
+              onClick={onSaveSkills}
+              disabled={isReadOnlyUser || skillsSavePending || !skillsDirty}
+              className="inline-flex items-center gap-2 rounded border border-[#22c55e]/30 bg-[#22c55e]/10 px-3 py-1.5 text-xs font-bold text-[#4ade80] transition-all hover:bg-[#22c55e]/20 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <SymbolIcon name="save" className="h-4 w-4" />
+              {skillsSavePending ? "Saving..." : "Save Skills"}
+            </button>
+          </>
         ) : null}
 
         {activeView === "github-sync" ? (

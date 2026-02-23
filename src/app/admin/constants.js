@@ -1,6 +1,5 @@
 export const NAV_ITEMS = [
   { id: "dashboard", label: "Dashboard", icon: "dashboard", accent: "primary" },
-  { id: "project-editor", label: "Project Editor", icon: "edit_note", accent: "primary" },
   { id: "projects", label: "Projects", icon: "folder_open", accent: "primary" },
   { id: "messages", label: "Live Chat", icon: "message", accent: "primary" },
   { id: "tech-stack", label: "Tech Stack", icon: "memory", accent: "secondary" },
@@ -12,13 +11,7 @@ export const NAV_ITEMS = [
     helper: { label: "Live", kind: "pill" },
   },
   { id: "assets", label: "3D Assets", icon: "view_in_ar", accent: "primary" },
-  {
-    id: "inquiries",
-    label: "Inquiries",
-    icon: "mail",
-    accent: "accent",
-    helper: { label: "3", kind: "badge" },
-  },
+  { id: "inquiries", label: "Inquiries", icon: "mail", accent: "accent" },
 ];
 
 export const HERO_PROJECTS = [
@@ -223,11 +216,10 @@ export const accentClass = {
 
 export const viewMeta = {
   dashboard: { title: "Content Manager", subtitle: "Portfolio overview and content controls." },
-  "project-editor": { title: "Edit Project", subtitle: "ID: prj_8x92nm2 - Last edited 2 hours ago" },
   projects: { title: "Projects", subtitle: "Total: 12" },
   messages: { title: "Live Chat", subtitle: "Respond to realtime inquiries." },
   "tech-stack": { title: "Tech Stack Manager", subtitle: "Tune stacks, visibility, and proficiency." },
   "github-sync": { title: "GitHub Sync", subtitle: "Repository metadata and contribution refresh." },
   assets: { title: "3D Assets Library", subtitle: "Manage GLB / GLTF / OBJ assets." },
-  inquiries: { title: "Inquiries Inbox", subtitle: "24 total inbound inquiries." },
+  inquiries: { title: "Inquiries Inbox", subtitle: "Contact form submissions." },
 };
