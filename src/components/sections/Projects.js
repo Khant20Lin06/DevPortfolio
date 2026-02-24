@@ -279,6 +279,11 @@ export default function Projects({ data = defaultPortfolioContent.projects }) {
                             src={resolveProjectImageUrl(project.image)}
                             alt={project.title}
                             loading="lazy"
+                            onError={(event) => {
+                              const fallback = "/assets/project-shot-1.png";
+                              if (event.currentTarget.src.endsWith(fallback)) return;
+                              event.currentTarget.src = fallback;
+                            }}
                             className={`h-full w-full object-cover object-center transition-transform duration-700 ${
                               isTouchActive ? "scale-110" : "scale-100"
                             } group-hover:scale-110`}
