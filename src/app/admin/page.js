@@ -759,14 +759,48 @@ export default function AdminPage() {
       return;
     }
 
-    setProfileDraft((prev) => ({
-      ...normalizeProfile(prev),
+    const nextProfile = normalizeProfile({
+      ...normalizeProfile(profileDraft),
       [field]: uploadedUrl,
-    }));
+    });
+    setProfileDraft(nextProfile);
     setProfileDirty(true);
+    setProfileSaving(true);
+    setProfileMessage({ tone: "neutral", text: "Upload complete. Saving profile..." });
+
+    const saveResponse = await updateAdminContent({
+      token,
+      key: "profile",
+      data: nextProfile,
+    });
+    setProfileSaving(false);
+
+    if (!saveResponse.ok) {
+      if (saveResponse.status === 401) {
+        clearAuthToken();
+        router.replace("/login");
+        return;
+      }
+      const fieldMessage = saveResponse.data?.fieldErrors
+        ? Object.values(saveResponse.data.fieldErrors).join(" ")
+        : "";
+      setProfileMessage({
+        tone: "error",
+        text:
+          fieldMessage ||
+          saveResponse.data?.message ||
+          "Upload succeeded but profile save failed. Click Save Profile to retry.",
+      });
+      return;
+    }
+
+    const persisted = normalizeProfile(saveResponse.data?.data ?? nextProfile);
+    setContent((prev) => ({ ...prev, profile: persisted }));
+    setProfileDraft(persisted);
+    setProfileDirty(false);
     setProfileMessage({
       tone: "success",
-      text: "File uploaded. Click Save Profile to publish.",
+      text: "File uploaded and saved.",
     });
   };
 
@@ -1057,19 +1091,54 @@ export default function AdminPage() {
       return;
     }
 
-    setProjectDrafts((prev) => {
-      const next = cloneJson(prev);
-      const current = next[index] ?? normalizeProject({});
-      next[index] = {
-        ...current,
-        image: uploadedUrl,
-      };
-      return next;
-    });
+    const nextDrafts = cloneJson(projectDrafts);
+    const current = nextDrafts[index] ?? normalizeProject({});
+    nextDrafts[index] = {
+      ...current,
+      image: uploadedUrl,
+    };
+
+    const payload = ensureArray(nextDrafts).map(normalizeProject);
+
+    setProjectDrafts(nextDrafts);
     setProjectDirty(true);
+    setProjectSaving(true);
+    setProjectMessage({ tone: "neutral", text: "Upload complete. Saving project..." });
+
+    const saveResponse = await updateAdminContent({
+      token,
+      key: "projects",
+      data: payload,
+    });
+
+    setProjectSaving(false);
+
+    if (!saveResponse.ok) {
+      if (saveResponse.status === 401) {
+        clearAuthToken();
+        router.replace("/login");
+        return;
+      }
+      const fieldMessage = saveResponse.data?.fieldErrors
+        ? Object.values(saveResponse.data.fieldErrors).join(" ")
+        : "";
+      setProjectMessage({
+        tone: "error",
+        text:
+          fieldMessage ||
+          saveResponse.data?.message ||
+          "Upload succeeded but project save failed. Click Save Changes to retry.",
+      });
+      return;
+    }
+
+    const persisted = ensureArray(saveResponse.data?.data ?? payload).map(normalizeProject);
+    setContent((prev) => ({ ...prev, projects: persisted }));
+    setProjectDrafts(persisted);
+    setProjectDirty(false);
     setProjectMessage({
       tone: "success",
-      text: "Image uploaded. Click Save Changes to publish.",
+      text: "Project image uploaded and saved.",
     });
   };
 

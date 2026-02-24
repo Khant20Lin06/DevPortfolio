@@ -79,7 +79,9 @@ export default function ProfileView({
         <section className="space-y-6 rounded-xl border border-white/5 glass-panel p-5">
           <div>
             <h4 className="text-sm font-semibold text-white">Image Assets</h4>
-            <p className="mt-1 text-xs text-slate-500">Upload files using the admin asset API.</p>
+            <p className="mt-1 text-xs text-slate-500">
+              Upload files using the admin asset API. File uploads auto-save profile content.
+            </p>
           </div>
 
           <div className="grid gap-5 md:grid-cols-2">

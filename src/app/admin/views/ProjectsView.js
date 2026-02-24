@@ -241,7 +241,7 @@ export default function ProjectsView({
                   </button>
                 </div>
                 <p className="mt-2 text-[11px] text-slate-500">
-                  JPG/PNG/WebP up to 25MB. Upload returns `/uploads/...` URL.
+                  JPG/PNG/WebP up to 25MB. Uploaded images auto-save to project content.
                 </p>
                 <input
                   ref={fileInputRef}
