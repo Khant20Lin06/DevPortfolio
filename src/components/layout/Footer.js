@@ -31,8 +31,8 @@ export default function Footer() {
           ))}
         </div>
 
-        <p className="text-center text-xs text-slate-600 md:text-right">
-          (c) {currentYear} Alex Developer. All rights reserved.
+        <p className="text-xs text-center text-slate-600 md:text-right">
+          (c) {currentYear} Khant Lin Developer. All rights reserved.
         </p>
       </div>
     </footer>
