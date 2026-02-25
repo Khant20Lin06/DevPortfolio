@@ -42,9 +42,24 @@ const WELCOME_SESSION_KEY = "portfolio_chat_welcome_shown";
 const resolveAssetUrl = (value) => {
   const input = String(value ?? "").trim();
   if (!input) return "";
-  if (/^https?:\/\//i.test(input)) return input;
   if (input.startsWith("/uploads/") && API_BASE_URL) {
     return `${API_BASE_URL}${input}`;
+  }
+  if (/^https?:\/\//i.test(input)) {
+    try {
+      const parsed = new URL(input);
+      const path = `${parsed.pathname}`.split("?")[0].split("#")[0];
+      if (path.startsWith("/uploads/")) {
+        const isLocalHost = parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1";
+        if (isLocalHost && API_BASE_URL) {
+          return `${API_BASE_URL}${path}`;
+        }
+        return `${parsed.origin}${path}`;
+      }
+    } catch (_error) {
+      return input;
+    }
+    return input;
   }
   return input;
 };

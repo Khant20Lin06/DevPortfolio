@@ -6,9 +6,24 @@ import { API_BASE_URL } from "@/lib/apiBase";
 const resolveImageUrl = (imageUrl) => {
   const value = String(imageUrl ?? "").trim();
   if (!value) return "/assets/project-shot-1.png";
-  if (/^https?:\/\//i.test(value)) return value;
   if (value.startsWith("/uploads/") && API_BASE_URL) {
     return `${API_BASE_URL}${value}`;
+  }
+  if (/^https?:\/\//i.test(value)) {
+    try {
+      const parsed = new URL(value);
+      const path = `${parsed.pathname}`.split("?")[0].split("#")[0];
+      if (path.startsWith("/uploads/")) {
+        const isLocalHost = parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1";
+        if (isLocalHost && API_BASE_URL) {
+          return `${API_BASE_URL}${path}`;
+        }
+        return `${parsed.origin}${path}`;
+      }
+    } catch (_error) {
+      return value;
+    }
+    return value;
   }
   return value;
 };
