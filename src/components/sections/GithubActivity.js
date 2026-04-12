@@ -1,8 +1,8 @@
-import { defaultPortfolioContent } from "@/data/portfolioData";
+import { emptyPortfolioContent } from "@/data/portfolioData";
 
-export default function GithubActivity({ data = defaultPortfolioContent.contributions }) {
-  const safeData = Array.isArray(data) && data.length > 0 ? data : defaultPortfolioContent.contributions;
-  const maxValue = Math.max(...safeData);
+export default function GithubActivity({ data = emptyPortfolioContent.contributions }) {
+  const safeData = Array.isArray(data) ? data : [];
+  const maxValue = safeData.length > 0 ? Math.max(...safeData) : 0;
 
   return (
     <section className="relative overflow-hidden border-y border-white/5 bg-[#0a0a12] py-16">
@@ -22,14 +22,20 @@ export default function GithubActivity({ data = defaultPortfolioContent.contribu
           </div>
         </div>
 
-        <div className="mask-gradient hide-scrollbar flex h-[180px] items-end overflow-x-auto px-4 pb-4 pt-8">
-          <div className="bar-3d-container">
-            {safeData.map((value, index) => {
-              const height = Math.max(16, Math.round((value / maxValue) * 100));
-              return <div key={`${value}-${index}`} className="bar-3d" style={{ height: `${height}%` }} />;
-            })}
+        {safeData.length > 0 ? (
+          <div className="mask-gradient hide-scrollbar flex h-[180px] items-end overflow-x-auto px-4 pb-4 pt-8">
+            <div className="bar-3d-container">
+              {safeData.map((value, index) => {
+                const height = maxValue > 0 ? Math.max(16, Math.round((value / maxValue) * 100)) : 16;
+                return <div key={`${value}-${index}`} className="bar-3d" style={{ height: `${height}%` }} />;
+              })}
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="rounded-2xl border border-dashed border-white/10 bg-[#0d1222]/50 px-6 py-12 text-sm text-slate-500">
+            No GitHub activity published yet.
+          </div>
+        )}
       </div>
     </section>
   );

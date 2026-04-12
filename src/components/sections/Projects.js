@@ -1,13 +1,31 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { defaultPortfolioContent } from "@/data/portfolioData";
+import { emptyPortfolioContent } from "@/data/portfolioData";
 import SymbolIcon from "@/components/ui/SymbolIcon";
 import { API_BASE_URL } from "@/lib/apiBase";
 
 const PROJECTS_PER_SLIDE = 3;
 const SWIPE_THRESHOLD_PX = 50;
 const AUTO_CYCLE_MS = 4200;
+const PROJECT_IMAGE_PLACEHOLDER =
+  "data:image/svg+xml;utf8," +
+  encodeURIComponent(`
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 675">
+      <defs>
+        <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
+          <stop offset="0%" stop-color="#0d1222"/>
+          <stop offset="100%" stop-color="#171b30"/>
+        </linearGradient>
+      </defs>
+      <rect width="1200" height="675" fill="url(#g)"/>
+      <circle cx="940" cy="170" r="110" fill="rgba(0,240,255,0.12)"/>
+      <circle cx="240" cy="520" r="140" fill="rgba(112,0,255,0.18)"/>
+      <rect x="420" y="220" width="360" height="220" rx="24" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="14"/>
+      <path d="M478 398l96-108 82 88 64-66 102 86" fill="none" stroke="#00f0ff" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="565" cy="278" r="22" fill="#00f0ff"/>
+    </svg>
+  `);
 
 const chunkProjects = (projects) => {
   const list = Array.isArray(projects) ? projects : [];
@@ -50,7 +68,7 @@ const getRealSlideIndex = (renderIndex, totalSlides) => {
 
 const resolveProjectImageUrl = (imageUrl) => {
   const value = String(imageUrl ?? "").trim();
-  if (!value) return "/assets/project-shot-1.png";
+  if (!value) return PROJECT_IMAGE_PLACEHOLDER;
   if (value.startsWith("/uploads/") && API_BASE_URL) {
     return `${API_BASE_URL}${value}`;
   }
@@ -80,7 +98,7 @@ const toExternalUrl = (value) => {
   return `https://${raw}`;
 };
 
-export default function Projects({ data = defaultPortfolioContent.projects }) {
+export default function Projects({ data = emptyPortfolioContent.projects }) {
   const slides = useMemo(() => chunkProjects(data), [data]);
   const totalSlides = slides.length;
   const renderSlides = useMemo(() => buildRenderSlides(slides), [slides]);
@@ -255,6 +273,11 @@ export default function Projects({ data = defaultPortfolioContent.projects }) {
           </div>
         </div>
 
+        {totalSlides === 0 ? (
+          <div className="rounded-2xl border border-dashed border-white/10 bg-[#0a0a12] px-6 py-16 text-center text-sm text-slate-500">
+            No featured projects published yet.
+          </div>
+        ) : (
         <div
           className="relative overflow-hidden touch-pan-y select-none"
           onMouseEnter={() => setIsAutoPaused(true)}
@@ -295,7 +318,7 @@ export default function Projects({ data = defaultPortfolioContent.projects }) {
                             alt={project.title}
                             loading="lazy"
                             onError={(event) => {
-                              const fallback = "/assets/project-shot-1.png";
+                              const fallback = PROJECT_IMAGE_PLACEHOLDER;
                               if (event.currentTarget.src.endsWith(fallback)) return;
                               event.currentTarget.src = fallback;
                             }}
@@ -399,6 +422,7 @@ export default function Projects({ data = defaultPortfolioContent.projects }) {
             ))}
           </div>
         </div>
+        )}
 
         {totalSlides > 1 ? (
           <div className="mt-6 flex items-center justify-center gap-2">

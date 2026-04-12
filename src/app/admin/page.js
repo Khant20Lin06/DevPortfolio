@@ -1,25 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import SymbolIcon from "@/components/ui/SymbolIcon";
 import {
   clearAuthToken,
   createAdminInquiry,
-  deleteAdminChatMessage,
   deleteAdminInquiry,
-  editAdminChatMessage,
   getAdminContent,
   getAdminInquiries,
   getAdminPortfolioAnalytics,
   getAdminNotifications,
-  getAdminChatMessages,
-  getAdminChatThreads,
   getAuthToken,
   getMe,
   isAuthApiEnabled,
-  reactAdminChatMessage,
-  sendAdminChatMessage,
   uploadAsset,
   updateAdminInquiry,
   updateAdminContent,
@@ -27,6 +21,7 @@ import {
 import { connectRealtime, disconnectRealtime } from "@/lib/realtime";
 import { getPushReasonHint, initPushNotifications } from "@/lib/pushNotifications";
 import { defaultPortfolioContent } from "@/data/portfolioData";
+import { useAdminChatController } from "@/features/chat/admin/useAdminChatController";
 import { HERO_PROJECTS, NAV_ITEMS } from "./constants";
 import { cloneJson, ensureArray, prettyJson } from "./utils";
 import AdminSidebar from "./components/AdminSidebar";
@@ -152,14 +147,6 @@ export default function AdminPage() {
   const [totalPortfolioViews, setTotalPortfolioViews] = useState(0);
   const [pushStatus, setPushStatus] = useState("idle");
   const [pushHint, setPushHint] = useState("");
-  const [chatThreads, setChatThreads] = useState([]);
-  const [chatPresenceByUser, setChatPresenceByUser] = useState({});
-  const [chatActiveUserId, setChatActiveUserId] = useState("");
-  const [chatMessages, setChatMessages] = useState([]);
-  const [chatLoading, setChatLoading] = useState(false);
-  const [chatSendPending, setChatSendPending] = useState(false);
-  const [chatForceScrollTick, setChatForceScrollTick] = useState(0);
-  const chatActiveUserIdRef = useRef("");
 
   useEffect(() => {
     let mounted = true;
@@ -260,6 +247,19 @@ export default function AdminPage() {
     }
   }, [authStatus, router]);
 
+  const adminChatController = useAdminChatController({
+    enabled: apiEnabled && Boolean(token) && user?.role === "admin",
+    token,
+    currentAdminId: user?.id ?? "",
+    onUnauthorized: () => {
+      clearAuthToken();
+      setToken("");
+      setUser(null);
+      router.replace("/login");
+    },
+    isOpen: activeView === "messages",
+  });
+
   useEffect(() => {
     setEditorText(prettyJson(content[selectedKey]));
   }, [content, selectedKey]);
@@ -351,68 +351,6 @@ export default function AdminPage() {
   }, [apiEnabled, token, user?.role]);
 
   useEffect(() => {
-    let cancelled = false;
-
-    const loadThreads = async () => {
-      if (!apiEnabled || !token || user?.role !== "admin") return;
-      const response = await getAdminChatThreads(token);
-      if (cancelled || !response.ok) return;
-      const threads = Array.isArray(response.data?.threads) ? response.data.threads : [];
-      setChatThreads(
-        threads.map((thread) => ({
-          userId: thread.userId,
-          user: thread.user,
-          message: thread.message,
-          senderRole: thread.senderRole,
-          senderId: thread.senderId,
-          deliveredAt: thread.deliveredAt,
-          seenAt: thread.seenAt,
-          createdAt: thread.createdAt,
-        }))
-      );
-      setChatPresenceByUser((prev) => {
-        const next = { ...prev };
-        threads.forEach((thread) => {
-          next[thread.userId] = thread.userPresence ?? next[thread.userId] ?? null;
-        });
-        return next;
-      });
-      if (threads.length && !chatActiveUserId) {
-        setChatActiveUserId(threads[0].userId);
-      }
-    };
-
-    void loadThreads();
-    const timer = setInterval(() => {
-      void loadThreads();
-    }, 10000);
-
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-    };
-  }, [apiEnabled, token, user?.role, chatActiveUserId]);
-
-  useEffect(() => {
-    const loadMessages = async () => {
-      if (!apiEnabled || !token || user?.role !== "admin" || !chatActiveUserId) return;
-      setChatLoading(true);
-      const response = await getAdminChatMessages({ token, userId: chatActiveUserId });
-      setChatLoading(false);
-      if (!response.ok) return;
-      const items = Array.isArray(response.data?.messages) ? response.data.messages : [];
-      setChatMessages(items.slice().reverse());
-      setChatForceScrollTick((tick) => tick + 1);
-    };
-
-    void loadMessages();
-  }, [apiEnabled, token, user?.role, chatActiveUserId]);
-
-  useEffect(() => {
-    chatActiveUserIdRef.current = chatActiveUserId;
-  }, [chatActiveUserId]);
-
-  useEffect(() => {
     if (!apiEnabled || !token || user?.role !== "admin") return;
     let cancelled = false;
 
@@ -491,156 +429,12 @@ export default function AdminPage() {
       setSelectedInquiryId((prev) => prev || incoming.id);
     };
 
-    const handleChatReceipt = (payload) => {
-      const ids = Array.isArray(payload?.messageIds) ? payload.messageIds : [];
-      if (ids.length === 0) return;
-      const target = new Set(ids);
-      setChatMessages((prev) =>
-        prev.map((item) => {
-          if (!target.has(item.id)) return item;
-          return {
-            ...item,
-            deliveredAt: payload.deliveredAt ?? item.deliveredAt ?? payload.seenAt ?? null,
-            seenAt: payload.seenAt ?? item.seenAt ?? null,
-          };
-        })
-      );
-    };
-
-    const handleUserPresence = (payload) => {
-      const userId = String(payload?.userId ?? "").trim();
-      if (!userId) return;
-      setChatPresenceByUser((prev) => ({
-        ...prev,
-        [userId]: {
-          isOnline: payload.isOnline === true,
-          lastActiveAt: payload.lastActiveAt ?? null,
-        },
-      }));
-    };
-
-    const handleChatMessage = (payload) => {
-      if (!payload?.userId) return;
-      if (payload?.senderRole === "user" && !payload?.deliveredAt) {
-        socket.emit("chat:admin_delivered", { userId: payload.userId }, () => {});
-      }
-      setChatThreads((prev) => {
-        const existingIndex = prev.findIndex((thread) => thread.userId === payload.userId);
-        const nextThread = {
-          userId: payload.userId,
-          user: payload.user ?? prev[existingIndex]?.user ?? null,
-          message: payload.message,
-          senderRole: payload.senderRole,
-          senderId: payload.senderId,
-          deliveredAt: payload.deliveredAt ?? null,
-          seenAt: payload.seenAt ?? null,
-          createdAt: payload.createdAt,
-        };
-        if (existingIndex === -1) {
-          return [nextThread, ...prev];
-        }
-        const next = [...prev];
-        next.splice(existingIndex, 1);
-        return [nextThread, ...next];
-      });
-
-      if (payload.userId === chatActiveUserIdRef.current) {
-        setChatMessages((prev) => [
-          ...prev,
-          ...(!payload.id || !prev.some((item) => item.id === payload.id)
-            ? [
-                {
-                  id: payload.id ?? `${Date.now()}`,
-                  message: payload.message,
-                  reaction: payload.reaction ?? null,
-                  senderRole: payload.senderRole,
-                  senderId: payload.senderId,
-                  deliveredAt: payload.deliveredAt ?? null,
-                  seenAt: payload.seenAt ?? null,
-                  createdAt: payload.createdAt ?? new Date().toISOString(),
-                },
-              ]
-            : []),
-        ]);
-      }
-    };
-
-    const handleChatUpdated = (payload) => {
-      if (!payload?.id || !payload?.userId) return;
-      if (payload.userId !== chatActiveUserIdRef.current) return;
-      setChatMessages((prev) =>
-        prev.map((item) =>
-          item.id === payload.id
-            ? {
-                ...item,
-                message: payload.message ?? item.message,
-                reaction: payload.reaction ?? item.reaction ?? null,
-                deliveredAt: payload.deliveredAt ?? item.deliveredAt ?? null,
-                seenAt: payload.seenAt ?? item.seenAt ?? null,
-              }
-            : item
-        )
-      );
-    };
-
-    const handleChatReaction = (payload) => {
-      if (!payload?.id || !payload?.userId) return;
-      if (payload.userId !== chatActiveUserIdRef.current) return;
-      setChatMessages((prev) =>
-        prev.map((item) =>
-          item.id === payload.id
-            ? {
-                ...item,
-                reaction: payload.reaction ?? null,
-              }
-            : item
-        )
-      );
-    };
-
-    const handleChatDeleted = (payload) => {
-      if (!payload?.id || !payload?.userId) return;
-      if (payload.deletedFor && payload.deletedFor !== "admin" && payload.deletedFor !== "both") return;
-      if (payload.userId !== chatActiveUserIdRef.current) return;
-      setChatMessages((prev) => prev.filter((item) => item.id !== payload.id));
-    };
-
-    const handleThreadHidden = (payload) => {
-      const userId = String(payload?.userId ?? "").trim();
-      if (!userId) return;
-      setChatThreads((prev) => prev.filter((thread) => thread.userId !== userId));
-      setChatPresenceByUser((prev) => {
-        if (!Object.prototype.hasOwnProperty.call(prev, userId)) return prev;
-        const next = { ...prev };
-        delete next[userId];
-        return next;
-      });
-      if (chatActiveUserIdRef.current === userId) {
-        setChatActiveUserId("");
-        setChatMessages([]);
-      }
-    };
-
     socket.on("notification:new", handleNotification);
     socket.on("contact:new", handleContactNew);
-    socket.on("chat:message", handleChatMessage);
-    socket.on("chat:receipt", handleChatReceipt);
-    socket.on("chat:message_updated", handleChatUpdated);
-    socket.on("chat:message_reaction", handleChatReaction);
-    socket.on("chat:message_deleted", handleChatDeleted);
-    socket.on("chat:thread_hidden", handleThreadHidden);
-    socket.on("presence:user", handleUserPresence);
 
     return () => {
       socket.off("notification:new", handleNotification);
       socket.off("contact:new", handleContactNew);
-      socket.off("chat:message", handleChatMessage);
-      socket.off("chat:receipt", handleChatReceipt);
-      socket.off("chat:message_updated", handleChatUpdated);
-      socket.off("chat:message_reaction", handleChatReaction);
-      socket.off("chat:message_deleted", handleChatDeleted);
-      socket.off("chat:thread_hidden", handleThreadHidden);
-      socket.off("presence:user", handleUserPresence);
     };
   }, [apiEnabled, token, user?.role]);
 
@@ -675,15 +469,7 @@ export default function AdminPage() {
     [skills]
   );
 
-  const chatUnreadCount = useMemo(
-    () =>
-      chatThreads.reduce(
-        (count, thread) =>
-          count + (thread?.senderRole === "user" && !thread?.seenAt ? 1 : 0),
-        0
-      ),
-    [chatThreads]
-  );
+  const chatUnreadCount = adminChatController.unreadCount;
 
   const inquiriesUnreadCount = useMemo(
     () => inquiries.reduce((count, item) => count + (item?.unread ? 1 : 0), 0),
@@ -1250,131 +1036,6 @@ export default function AdminPage() {
     setSkillMessage({ tone: "success", text: "Tech stack updated successfully." });
   };
 
-  const handleAdminChatSend = async (userId, message) => {
-    if (!userId) return;
-    if (!apiEnabled) return;
-    if (!token || user?.role !== "admin") return;
-
-    setChatSendPending(true);
-    const response = await sendAdminChatMessage({ token, userId, message });
-    setChatSendPending(false);
-
-    if (!response.ok) return;
-    setChatMessages((prev) => [
-      ...prev,
-      ...(!response.data?.id || !prev.some((item) => item.id === response.data.id)
-        ? [
-            {
-              id: response.data?.id ?? `${Date.now()}`,
-              message: response.data?.message ?? message,
-              reaction: response.data?.reaction ?? null,
-              senderRole: response.data?.senderRole ?? "admin",
-              senderId: response.data?.senderId ?? user?.id,
-              deliveredAt: response.data?.deliveredAt ?? null,
-              seenAt: response.data?.seenAt ?? null,
-              createdAt: response.data?.createdAt ?? new Date().toISOString(),
-            },
-          ]
-        : []),
-    ]);
-    setChatForceScrollTick((tick) => tick + 1);
-  };
-
-  const handleAdminChatEdit = async (userId, messageId, message) => {
-    if (!userId || !messageId) return { ok: false, message: "Message not found." };
-    if (!apiEnabled) return { ok: false, message: "API is disabled." };
-    if (!token || user?.role !== "admin") return { ok: false, message: "Admin login required." };
-
-    const response = await editAdminChatMessage({
-      token,
-      userId,
-      messageId,
-      message,
-    });
-
-    if (!response.ok) {
-      if (response.status === 401) {
-        clearAuthToken();
-        router.replace("/login");
-        return { ok: false, message: "Session expired." };
-      }
-      return { ok: false, message: response.data?.message || "Failed to edit message." };
-    }
-
-    setChatMessages((prev) =>
-      prev.map((item) =>
-        item.id === messageId
-          ? {
-              ...item,
-              message: response.data?.message ?? message,
-              reaction: response.data?.reaction ?? item.reaction ?? null,
-              deliveredAt: response.data?.deliveredAt ?? item.deliveredAt ?? null,
-              seenAt: response.data?.seenAt ?? item.seenAt ?? null,
-            }
-          : item
-      )
-    );
-    return { ok: true };
-  };
-
-  const handleAdminChatDelete = async (userId, messageId) => {
-    if (!userId || !messageId) return { ok: false, message: "Message not found." };
-    if (!apiEnabled) return { ok: false, message: "API is disabled." };
-    if (!token || user?.role !== "admin") return { ok: false, message: "Admin login required." };
-
-    const response = await deleteAdminChatMessage({
-      token,
-      userId,
-      messageId,
-    });
-
-    if (!response.ok) {
-      if (response.status === 401) {
-        clearAuthToken();
-        router.replace("/login");
-        return { ok: false, message: "Session expired." };
-      }
-      return { ok: false, message: response.data?.message || "Failed to delete message." };
-    }
-
-    setChatMessages((prev) => prev.filter((item) => item.id !== messageId));
-    return { ok: true };
-  };
-
-  const handleAdminChatReaction = async (userId, messageId, emoji) => {
-    if (!userId || !messageId) return { ok: false, message: "Message not found." };
-    if (!apiEnabled) return { ok: false, message: "API is disabled." };
-    if (!token || user?.role !== "admin") return { ok: false, message: "Admin login required." };
-
-    const response = await reactAdminChatMessage({
-      token,
-      userId,
-      messageId,
-      emoji,
-    });
-
-    if (!response.ok) {
-      if (response.status === 401) {
-        clearAuthToken();
-        router.replace("/login");
-        return { ok: false, message: "Session expired." };
-      }
-      return { ok: false, message: response.data?.message || "Failed to react." };
-    }
-
-    setChatMessages((prev) =>
-      prev.map((item) =>
-        item.id === messageId
-          ? {
-              ...item,
-              reaction: response.data?.reaction ?? null,
-            }
-          : item
-      )
-    );
-    return { ok: true, reaction: response.data?.reaction ?? null };
-  };
-
   const handleProjectsSave = async () => {
     const payload = ensureArray(projectDrafts).map(normalizeProject);
 
@@ -1512,13 +1173,6 @@ export default function AdminPage() {
     }
     setPushStatus("error");
     setPushHint(getPushReasonHint(result.reason));
-  };
-
-  const handleAdminMarkSeen = (userId) => {
-    if (!userId) return;
-    const socket = connectRealtime();
-    if (!socket) return;
-    socket.emit("chat:admin_seen", { userId }, () => {});
   };
 
   if (authStatus === "checking") {
@@ -1692,6 +1346,7 @@ export default function AdminPage() {
             ) : null}
             {activeView === "messages" ? (
               <AdminChatView
+                controller={adminChatController}
                 enabled={apiEnabled && Boolean(token) && user?.role === "admin"}
                 token={token}
                 currentAdminId={user?.id ?? ""}

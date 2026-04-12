@@ -1,6 +1,8 @@
-import { defaultPortfolioContent } from "@/data/portfolioData";
+import { emptyPortfolioContent } from "@/data/portfolioData";
 
-export default function Experience({ data = defaultPortfolioContent.experience }) {
+export default function Experience({ data = emptyPortfolioContent.experience }) {
+  const items = Array.isArray(data) ? data : [];
+
   return (
     <section id="experience" className="py-24">
       <div className="layout-container mx-auto max-w-[960px] px-4">
@@ -14,9 +16,13 @@ export default function Experience({ data = defaultPortfolioContent.experience }
         <div className="relative ml-4 space-y-16 border-l border-white/10 md:ml-0 md:border-none md:pl-0">
           <div className="absolute bottom-0 left-1/2 top-0 hidden w-px -translate-x-1/2 bg-gradient-to-b from-[#00f0ff] via-[#7000ff] to-[#00f0ff] opacity-30 md:block" />
 
-          {data.map((item, index) => {
+          {items.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-white/10 bg-[#0a0a12]/50 px-6 py-12 text-center text-sm text-slate-500">
+              No experience entries published yet.
+            </div>
+          ) : items.map((item, index) => {
             const isMiddle = index === 1;
-            const isLast = index === data.length - 1;
+            const isLast = index === items.length - 1;
 
             const bulletClass = isMiddle
               ? "border-[#7000ff] shadow-[0_0_15px_rgba(112,0,255,0.8)] group-hover:bg-[#7000ff]"

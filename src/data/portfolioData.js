@@ -7,6 +7,77 @@ export const navLinks = [
   { id: "contact", label: "Contact" },
 ];
 
+export const emptyPortfolioContent = {
+  hero: {
+    badge: "",
+    titlePrefix: "",
+    titleHighlight: "",
+    description: "",
+    primaryCtaLabel: "",
+    primaryCtaTarget: "#projects",
+    secondaryCtaLabel: "",
+    secondaryCtaTarget: "#contact",
+    techPills: [],
+  },
+  about: {
+    title: "",
+    paragraphOne: "",
+    paragraphTwo: "",
+    stats: [],
+  },
+  skills: [],
+  projects: [],
+  experience: [],
+  contributions: [],
+  profile: {
+    aboutImageUrl: "",
+    profileImageUrl: "",
+    resumeUrl: "",
+    social: {
+      linkedin: "",
+      github: "",
+      telegram: "",
+      gmail: "",
+      location: "",
+    },
+  },
+};
+
+export const normalizePortfolioContent = (incoming) => {
+  const value = incoming && typeof incoming === "object" ? incoming : {};
+  const profile = value.profile && typeof value.profile === "object" ? value.profile : {};
+  const social = profile.social && typeof profile.social === "object" ? profile.social : {};
+  const about = value.about && typeof value.about === "object" ? value.about : {};
+  const hero = value.hero && typeof value.hero === "object" ? value.hero : {};
+
+  return {
+    ...emptyPortfolioContent,
+    ...value,
+    hero: {
+      ...emptyPortfolioContent.hero,
+      ...hero,
+      techPills: Array.isArray(hero.techPills) ? hero.techPills : [],
+    },
+    about: {
+      ...emptyPortfolioContent.about,
+      ...about,
+      stats: Array.isArray(about.stats) ? about.stats : [],
+    },
+    skills: Array.isArray(value.skills) ? value.skills : [],
+    projects: Array.isArray(value.projects) ? value.projects : [],
+    experience: Array.isArray(value.experience) ? value.experience : [],
+    contributions: Array.isArray(value.contributions) ? value.contributions : [],
+    profile: {
+      ...emptyPortfolioContent.profile,
+      ...profile,
+      social: {
+        ...emptyPortfolioContent.profile.social,
+        ...social,
+      },
+    },
+  };
+};
+
 export const defaultPortfolioContent = {
   hero: {
     badge: "System Online",

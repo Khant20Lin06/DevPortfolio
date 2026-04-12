@@ -4,6 +4,7 @@ import AdminMessengerPanel from "@/features/chat/admin/AdminMessengerPanel";
 import { useAdminChatController } from "@/features/chat/admin/useAdminChatController";
 
 export default function AdminChatView({
+  controller: providedController,
   enabled = false,
   token = "",
   currentAdminId = "",
@@ -17,14 +18,16 @@ export default function AdminChatView({
   pushHint = "",
   onEnableNotifications,
 }) {
-  const controller = useAdminChatController({
-    enabled,
+  const shouldOwnController = !providedController;
+  const ownedController = useAdminChatController({
+    enabled: shouldOwnController && enabled,
     token,
     currentAdminId,
     onUnauthorized,
     isOpen,
     resetToListOnOpen,
   });
+  const controller = providedController ?? ownedController;
 
   return (
     <AdminMessengerPanel
@@ -39,4 +42,3 @@ export default function AdminChatView({
     />
   );
 }
-

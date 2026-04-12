@@ -1,9 +1,11 @@
-import { defaultPortfolioContent } from "@/data/portfolioData";
+import { emptyPortfolioContent } from "@/data/portfolioData";
 import SymbolIcon from "@/components/ui/SymbolIcon";
 
 const iconNameByIndex = ["html", "dns", "terminal"];
 
-export default function TechStack({ data = defaultPortfolioContent.skills }) {
+export default function TechStack({ data = emptyPortfolioContent.skills }) {
+  const groups = Array.isArray(data) ? data : [];
+
   return (
     <section id="skills" className="relative overflow-hidden py-24">
       <div className="pointer-events-none absolute right-0 top-0 h-full w-2/3 bg-gradient-to-l from-[#7000ff]/5 to-transparent" />
@@ -17,7 +19,11 @@ export default function TechStack({ data = defaultPortfolioContent.skills }) {
         </div>
 
         <div className="card-3d-wrapper grid gap-8 md:grid-cols-3">
-          {data.map((group, index) => {
+          {groups.length === 0 ? (
+            <div className="md:col-span-3 rounded-2xl border border-dashed border-white/10 bg-[#0a0a12] px-6 py-12 text-center text-sm text-slate-500">
+              No technical skills published yet.
+            </div>
+          ) : groups.map((group, index) => {
             const isTools = index === 2 || /tools/i.test(group.title);
             const isBackend = index === 1;
 

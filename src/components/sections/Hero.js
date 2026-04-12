@@ -1,4 +1,4 @@
-import { defaultPortfolioContent } from "@/data/portfolioData";
+import { emptyPortfolioContent } from "@/data/portfolioData";
 import HeroCubeScene from "@/components/three/HeroCubeScene";
 import SymbolIcon from "@/components/ui/SymbolIcon";
 
@@ -11,7 +11,7 @@ const normalizeMailHref = (value) => {
 };
 
 const normalizeProfile = (value) => {
-  const fallback = defaultPortfolioContent.profile ?? {};
+  const fallback = emptyPortfolioContent.profile ?? {};
   const social = value?.social ?? {};
   return {
     linkedin: String(social?.linkedin ?? fallback?.social?.linkedin ?? ""),
@@ -23,17 +23,17 @@ const normalizeProfile = (value) => {
 };
 
 export default function Hero({
-  data = defaultPortfolioContent.hero,
-  profile = defaultPortfolioContent.profile,
+  data = emptyPortfolioContent.hero,
+  profile = emptyPortfolioContent.profile,
 }) {
   const social = normalizeProfile(profile);
   const heroIcons = [
-    { key: "linkedin", href: social.linkedin || "https://www.linkedin.com", icon: "linkedin", label: "LinkedIn" },
-    { key: "github", href: social.github || "https://github.com", icon: "github", label: "GitHub" },
-    { key: "gmail", href: social.gmail || "mailto:alexdeveloper@gmail.com", icon: "mail", label: "Gmail" },
-    { key: "telegram", href: social.telegram || "https://t.me", icon: "send", label: "Telegram" },
-    { key: "location", href: social.location || "https://maps.google.com", icon: "location", label: "Location" },
-  ];
+    { key: "linkedin", href: social.linkedin, icon: "linkedin", label: "LinkedIn" },
+    { key: "github", href: social.github, icon: "github", label: "GitHub" },
+    { key: "gmail", href: social.gmail, icon: "mail", label: "Gmail" },
+    { key: "telegram", href: social.telegram, icon: "send", label: "Telegram" },
+    { key: "location", href: social.location, icon: "location", label: "Location" },
+  ].filter((item) => Boolean(String(item.href ?? "").trim()));
 
   return (
     <section id="home" className="relative flex min-h-[90vh] items-center justify-center overflow-hidden px-4 py-20">
@@ -44,13 +44,15 @@ export default function Hero({
 
       <div className="layout-container z-10 flex w-full max-w-[1200px] flex-col items-center justify-between gap-12 lg:flex-row">
         <div className="flex flex-1 flex-col gap-8 text-center lg:text-left">
-          <div className="mx-auto inline-flex w-fit items-center gap-3 rounded-full border border-[#00f0ff]/30 bg-[#0a0a12]/80 px-4 py-2 shadow-[0_0_15px_rgba(0,240,255,0.15)] backdrop-blur-md lg:mx-0">
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#00f0ff] opacity-75" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-[#00f0ff]" />
-            </span>
-            <span className="text-xs font-bold uppercase tracking-widest text-[#00f0ff]">{data.badge}</span>
-          </div>
+          {data.badge ? (
+            <div className="mx-auto inline-flex w-fit items-center gap-3 rounded-full border border-[#00f0ff]/30 bg-[#0a0a12]/80 px-4 py-2 shadow-[0_0_15px_rgba(0,240,255,0.15)] backdrop-blur-md lg:mx-0">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#00f0ff] opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-[#00f0ff]" />
+              </span>
+              <span className="text-xs font-bold uppercase tracking-widest text-[#00f0ff]">{data.badge}</span>
+            </div>
+          ) : null}
 
           <h1 className="text-5xl font-bold leading-[1.1] tracking-[-0.033em] text-white drop-shadow-lg md:text-7xl">
             {data.titlePrefix}
@@ -63,45 +65,55 @@ export default function Hero({
             </span>
           </h1>
 
-          <p className="mx-auto max-w-2xl border-l-2 border-[#00f0ff]/50 pl-6 text-lg font-light leading-relaxed text-slate-400 md:text-xl lg:mx-0">
-            {data.description}
-          </p>
+          {data.description ? (
+            <p className="mx-auto max-w-2xl border-l-2 border-[#00f0ff]/50 pl-6 text-lg font-light leading-relaxed text-slate-400 md:text-xl lg:mx-0">
+              {data.description}
+            </p>
+          ) : null}
 
-          <div className="flex flex-wrap justify-center gap-6 pt-4 lg:justify-start">
-            <a
-              href={data.primaryCtaTarget}
-              className="group relative flex h-14 items-center justify-center overflow-hidden rounded-lg border border-[#00f0ff] bg-[#00f0ff]/10 px-8 text-base font-bold text-[#00f0ff] shadow-[0_0_20px_rgba(0,240,255,0.2)] transition-all hover:bg-[#00f0ff] hover:text-black hover:shadow-[0_0_30px_rgba(0,240,255,0.6)]"
-            >
-              <span className="relative z-10">{data.primaryCtaLabel}</span>
-              <span className="absolute inset-0 origin-left scale-x-0 bg-[#00f0ff] transition-transform duration-300 group-hover:scale-x-100" />
-            </a>
-
-            <a
-              href={data.secondaryCtaTarget}
-              className="flex h-14 items-center justify-center rounded-lg border border-white/10 bg-[#0a0a12] px-8 text-base font-bold text-white transition-all hover:border-white/30 hover:bg-white/5"
-            >
-              {data.secondaryCtaLabel}
-            </a>
-          </div>
-
-          <div className="flex items-center justify-center gap-6 pt-4 lg:justify-start">
-            {heroIcons.map((item) => {
-              const opensNewTab = !String(item.href).startsWith("mailto:");
-              return (
+          {data.primaryCtaLabel || data.secondaryCtaLabel ? (
+            <div className="flex flex-wrap justify-center gap-6 pt-4 lg:justify-start">
+              {data.primaryCtaLabel ? (
                 <a
-                  key={item.key}
-                  className="text-slate-400 transition-all duration-300 hover:-translate-y-1 hover:text-[#00f0ff]"
-                  href={item.href}
-                  target={opensNewTab ? "_blank" : undefined}
-                  rel={opensNewTab ? "noreferrer" : undefined}
-                  aria-label={item.label}
-                  title={item.label}
+                  href={data.primaryCtaTarget}
+                  className="group relative flex h-14 items-center justify-center overflow-hidden rounded-lg border border-[#00f0ff] bg-[#00f0ff]/10 px-8 text-base font-bold text-[#00f0ff] shadow-[0_0_20px_rgba(0,240,255,0.2)] transition-all hover:bg-[#00f0ff] hover:text-black hover:shadow-[0_0_30px_rgba(0,240,255,0.6)]"
                 >
-                  <SymbolIcon name={item.icon} className="h-7 w-7" />
+                  <span className="relative z-10">{data.primaryCtaLabel}</span>
+                  <span className="absolute inset-0 origin-left scale-x-0 bg-[#00f0ff] transition-transform duration-300 group-hover:scale-x-100" />
                 </a>
-              );
-            })}
-          </div>
+              ) : null}
+
+              {data.secondaryCtaLabel ? (
+                <a
+                  href={data.secondaryCtaTarget}
+                  className="flex h-14 items-center justify-center rounded-lg border border-white/10 bg-[#0a0a12] px-8 text-base font-bold text-white transition-all hover:border-white/30 hover:bg-white/5"
+                >
+                  {data.secondaryCtaLabel}
+                </a>
+              ) : null}
+            </div>
+          ) : null}
+
+          {heroIcons.length > 0 ? (
+            <div className="flex items-center justify-center gap-6 pt-4 lg:justify-start">
+              {heroIcons.map((item) => {
+                const opensNewTab = !String(item.href).startsWith("mailto:");
+                return (
+                  <a
+                    key={item.key}
+                    className="text-slate-400 transition-all duration-300 hover:-translate-y-1 hover:text-[#00f0ff]"
+                    href={item.href}
+                    target={opensNewTab ? "_blank" : undefined}
+                    rel={opensNewTab ? "noreferrer" : undefined}
+                    aria-label={item.label}
+                    title={item.label}
+                  >
+                    <SymbolIcon name={item.icon} className="h-7 w-7" />
+                  </a>
+                );
+              })}
+            </div>
+          ) : null}
         </div>
 
         <div className="relative flex h-[500px] w-full flex-1 justify-center lg:justify-end">
